@@ -32,7 +32,8 @@ pnpm add dsh-saynext
 ```
 
 Then add `dsh-saynext` to the `dsh.profile.bundles` array in `package.json` and run `pnpm install` once more.
-Once the plugin is listed, you can also install it from **Settings → Plugin Market**.
+Once the plugin is listed, you can also install it from **Settings → Plugin Market** by searching for
+`dsh-saynext`.
 
 For local development a link is easier:
 
@@ -41,11 +42,12 @@ For local development a link is easier:
 ```
 
 `lib/index.js` imports `@deepseek-ai/schemastery` at runtime (shipped inside DSH, declared as a peer dependency
-so you do not end up with a second copy). npm installs that peer for you; pnpm does not by default (this profile
-also has automatic peer installation off), in which case the runtime provides it. With a link install where Node
+so you do not end up with a second copy). npm installs that peer for you; this profile has automatic peer installation
+turned off, so pnpm adds no second copy and DSH's own runtime copy is used. With a link install where Node
 cannot resolve it, add one symlink:
 
 ```bash
+cd /absolute/path/to/dsh-saynext   # the next command must run in this directory
 mkdir -p node_modules/@deepseek-ai
 ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
       node_modules/@deepseek-ai/schemastery

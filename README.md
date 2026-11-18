@@ -36,10 +36,11 @@ pnpm add dsh-saynext
 ```
 
 `lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，已声明为 peer 依赖，免得装出第二份）。
-npm 会顺带装一份 peer；pnpm 默认不装（这个 profile 也关掉了自动装 peer），此时由运行时提供。
+npm 会顺带装一份 peer；这个 profile 关掉了「自动安装 peer」，所以用 pnpm 时不会再装一份，直接由 DSH 运行时提供。
 用 link 安装、且项目目录里 Node 解析不到时，补一条软链：
 
 ```bash
+cd /绝对路径/到/dsh-saynext      # 下一条命令必须在这个目录里执行
 mkdir -p node_modules/@deepseek-ai
 ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
       node_modules/@deepseek-ai/schemastery
