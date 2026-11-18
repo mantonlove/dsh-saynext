@@ -2,7 +2,7 @@
 
 [中文](README.md) · [English](README.en.md)
 
-Adds a "next line" to the DSH composer: after each turn finishes, it guesses the sentence you are most
+Adds a "next line" to the DSH composer: after each turn finishes normally, it guesses the sentence you are most
 likely to say next and leaves it just above the input box. Press **Enter** to drop it into the composer
 (**nothing is sent**); press **Enter** again to send.
 
@@ -18,7 +18,8 @@ likely to say next and leaves it just above the input box. Press **Enter** to dr
 - When the composer is empty and no turn is running, that sentence shows as a grey pill above the composer.
 - Enter while the composer has focus: the sentence is copied into the composer and **not sent**; a second
   Enter sends it.
-- Enter anywhere else (sidebar search, settings field, rename box): nothing happens, the pill stays put.
+- Enter anywhere else (sidebar search, settings field, rename box): the plugin ignores the key, the pill stays put,
+  and that control behaves exactly as before.
 - The pill hides itself while the composer already has text or while a turn is still streaming.
 
 ## Install
@@ -31,8 +32,7 @@ pnpm add dsh-saynext
 ```
 
 Then add `dsh-saynext` to the `dsh.profile.bundles` array in `package.json` and run `pnpm install` once more.
-Once the plugin is listed in the market you can simply install it from **Settings → Plugin Market**, which
-registers the bundle for you.
+Once the plugin is listed, you can also install it from **Settings → Plugin Market**.
 
 For local development a link is easier:
 
@@ -40,9 +40,10 @@ For local development a link is easier:
 "dsh-saynext": "link:/absolute/path/to/dsh-saynext"
 ```
 
-`lib/index.js` imports `@deepseek-ai/schemastery` at runtime (shipped inside DSH, not published to npm, hence
-declared as a peer dependency). With an npm install it resolves from the profile's `node_modules`; with a link
-install where Node cannot resolve it, add one symlink:
+`lib/index.js` imports `@deepseek-ai/schemastery` at runtime (shipped inside DSH, declared as a peer dependency
+so you do not end up with a second copy). npm installs that peer for you; pnpm does not by default (this profile
+also has automatic peer installation off), in which case the runtime provides it. With a link install where Node
+cannot resolve it, add one symlink:
 
 ```bash
 mkdir -p node_modules/@deepseek-ai
@@ -61,22 +62,15 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 ## Payload
 
 There is exactly one channel between host and UI: the `hint` field of the plugin's settings namespace
-`saynext`, holding a JSON string.
+`saynext`, holding a JSON string shaped like `{"rev": 4, "items": [ … ]}`. Each entry in `items` carries:
 
-```json
-{
-  "rev": 4,
-  "items": [
-    {
-      "sessionId": "session-…",
-      "text": "新增 publish.yml，实现 tag 触发自动发布",
-      "turn": 12,
-      "rev": 4,
-      "at": 1763624000000
-    }
-  ]
-}
-```
+| Field | Meaning |
+| --- | --- |
+| `sessionId` | which session the suggestion belongs to |
+| `text` | the suggested sentence |
+| `turn` | the turn that produced it |
+| `rev` | payload revision, used by the UI to detect changes |
+| `at` | creation timestamp in milliseconds |
 
 The UI reads this configuration once a second and only accepts the entry whose `sessionId` matches the
 current session, so several sessions running in parallel never see each other's suggestion.
@@ -88,7 +82,7 @@ current session, so several sessions running in parallel never see each other's 
 | Turn did not end normally (aborted, failed) | no new suggestion, the previous one stays |
 | A turn is streaming | pill hidden, no interference |
 | Composer already has text | pill hidden, no interference |
-| Focus outside the composer | Enter is not intercepted |
+| Focus outside the composer | the plugin does not intercept that key; the pill stays put |
 | Several sessions open | one suggestion each, up to 8 cached |
 
 Be clear about the cost: **one extra model call after every turn** (last 4 turns of that session, at most

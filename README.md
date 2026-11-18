@@ -14,7 +14,7 @@
 - 一条会话的一轮**正常收尾**时，宿主拿这条会话最近 4 轮对话问一次模型，要一句可以直接发送的指令。
 - 输入框为空、且这条会话没有回合在跑时，这句话显示成输入框上方的灰字胶囊。
 - 焦点在输入框里按 Enter：只把这句话填进输入框，**不发送**；再按一次 Enter 才真正发出。
-- 焦点在别处（侧栏搜索、设置项、重命名框）按 Enter：什么都不会发生，胶囊原地不动。
+- 焦点在别处（侧栏搜索、设置项、重命名框）按 Enter：插件不碰这个键，胶囊原地不动，那个控件照常响应。
 - 输入框里已经有字、或正在流式输出时，胶囊自动隐藏。
 
 ## 安装
@@ -27,7 +27,7 @@ pnpm add dsh-saynext
 ```
 
 装完把 `dsh-saynext` 加进 `package.json` 的 `dsh.profile.bundles` 数组，再 `pnpm install` 一次。
-上市之后直接在 **设置 → 插件市场** 搜 dsh-saynext 安装即可，bundles 由市场自动登记。
+市场收录之后，也可以直接在 **设置 → 插件市场** 搜 dsh-saynext 安装。
 
 本地改代码时用 link 更顺手：
 
@@ -35,8 +35,9 @@ pnpm add dsh-saynext
 "dsh-saynext": "link:/绝对路径/到/dsh-saynext"
 ```
 
-`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，npm 上不发布，已声明为 peer 依赖）。
-用 npm 安装时它由 profile 的 `node_modules` 解析；用 link 安装、且项目目录里 Node 解析不到时，补一条软链：
+`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，已声明为 peer 依赖，免得装出第二份）。
+npm 会顺带装一份 peer；pnpm 默认不装（这个 profile 也关掉了自动装 peer），此时由运行时提供。
+用 link 安装、且项目目录里 Node 解析不到时，补一条软链：
 
 ```bash
 mkdir -p node_modules/@deepseek-ai
@@ -54,22 +55,16 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 
 ## 载荷格式
 
-宿主与界面之间只有一条通道：插件配置命名空间 `saynext` 的 `hint` 字段，内容是一段 JSON 字符串。
+宿主与界面之间只有一条通道：插件配置命名空间 `saynext` 的 `hint` 字段，内容是一段 JSON 字符串，
+整体形如 `{"rev": 4, "items": [ … ]}`。`items` 里每条记录包含这些字段：
 
-```json
-{
-  "rev": 4,
-  "items": [
-    {
-      "sessionId": "session-…",
-      "text": "新增 publish.yml，实现 tag 触发自动发布",
-      "turn": 12,
-      "rev": 4,
-      "at": 1763624000000
-    }
-  ]
-}
-```
+| 字段 | 含义 |
+| --- | --- |
+| `sessionId` | 这条建议属于哪条会话 |
+| `text` | 建议正文 |
+| `turn` | 产生它的回合号 |
+| `rev` | 载荷版本，界面靠它判断有没有变化 |
+| `at` | 生成时间戳（毫秒） |
 
 界面每秒读一次这份配置，只认 `sessionId` 与当前会话相同的那一条，所以多条会话同时跑着也互不串台。
 
@@ -80,7 +75,7 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 | 一轮没正常收尾（中断、报错） | 不生成建议，保留上一条 |
 | 正在流式输出 | 胶囊隐藏，不打断阅读 |
 | 输入框已有文字 | 胶囊隐藏，不挡你输入 |
-| 焦点不在输入框 | Enter 不拦截 |
+| 焦点不在输入框 | 插件不拦截该键，胶囊不动 |
 | 同时开多条会话 | 各自一条建议，最多缓存 8 条 |
 
 代价说清楚：**每轮结束后会多调一次模型**（取这段对话最近 4 轮、最多 4000 字，输出上限 400 token，20 秒超时），
