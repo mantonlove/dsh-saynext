@@ -9,8 +9,17 @@
     "dsh",
     "dsh-plugin",
     "composer",
-    "suggestion"
+    "suggestion",
+    "input-prediction"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mantonlove/dsh-saynext.git"
+  },
+  "homepage": "https://github.com/mantonlove/dsh-saynext#readme",
+  "bugs": {
+    "url": "https://github.com/mantonlove/dsh-saynext/issues"
+  },
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
@@ -25,6 +34,9 @@
   ],
   "engines": {
     "node": "^22.19 || >=24"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": ">=3.18.4 <4"
   },
   "dsh": {
     "engines": {
