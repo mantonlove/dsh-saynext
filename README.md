@@ -1,12 +1,23 @@
 # dsh-saynext
 
-给 DSH 输入框加一条「下一句」：每轮回答结束后，宿主拿这段对话去问一次模型，
-猜你紧接着最可能说的那句话，显示成输入框上方的一条灰字。
+[中文](README.md) · [English](README.en.md)
 
-输入框留空时它才出现；按 **Enter** 把这句话搬进输入框（**不发送**），
-再按一次 **Enter** 才真正发出去。输入框里有字时它自动让开。
+给 DSH 的输入框加一条「下一句」：每轮回答正常结束后，猜出你接下来最可能说的那一句，
+放在输入框上方。按 **Enter** 把它搬进输入框（**不发送**），再按一次 **Enter** 才发出去。
 
-## 装法
+![建议内容 / suggestion](https://raw.githubusercontent.com/mantonlove/dsh-saynext/main/assets/saynext.png)
+
+> 红框里那行灰字就是建议。它停在输入框上方时不抢焦点、不吃按键，你可以完全无视它。
+
+## 它做什么
+
+- 一条会话的一轮**正常收尾**时，宿主拿这条会话最近 4 轮对话问一次模型，要一句可以直接发送的指令。
+- 输入框为空、且这条会话没有回合在跑时，这句话显示成输入框上方的灰字胶囊。
+- 焦点在输入框里按 Enter：只把这句话填进输入框，**不发送**；再按一次 Enter 才真正发出。
+- 焦点在别处（侧栏搜索、设置项、重命名框）按 Enter：什么都不会发生，胶囊原地不动。
+- 输入框里已经有字、或正在流式输出时，胶囊自动隐藏。
+
+## 安装
 
 已经发在 npm：<https://www.npmjs.com/package/dsh-saynext>
 
@@ -15,20 +26,17 @@ cd ~/.dsh/profiles/desktop
 pnpm add dsh-saynext
 ```
 
-装完还要把 `dsh-saynext` 加进 `package.json` 的 `dsh.profile.bundles` 数组，再
-`pnpm install` 一次。上市之后直接在 **设置 → 插件市场** 搜 dsh-saynext 安装即可，
-bundles 由市场自动登记。
+装完把 `dsh-saynext` 加进 `package.json` 的 `dsh.profile.bundles` 数组，再 `pnpm install` 一次。
+上市之后直接在 **设置 → 插件市场** 搜 dsh-saynext 安装即可，bundles 由市场自动登记。
 
 本地改代码时用 link 更顺手：
 
-```bash
-# dependencies 里写（绝对路径）
+```json
 "dsh-saynext": "link:/绝对路径/到/dsh-saynext"
 ```
 
-`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，npm 上不发布，
-已在 package.json 里声明为 peer）。用 npm 装时它由 profile 的 node_modules 解析；
-用 link 装、且项目目录里 Node 解析不到时，补一条软链：
+`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，npm 上不发布，已声明为 peer 依赖）。
+用 npm 安装时它由 profile 的 `node_modules` 解析；用 link 安装、且项目目录里 Node 解析不到时，补一条软链：
 
 ```bash
 mkdir -p node_modules/@deepseek-ai
@@ -36,45 +44,70 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
       node_modules/@deepseek-ai/schemastery
 ```
 
-改完 `lib/` 下的代码要**重启 App** 才生效（宿主插件只在启动时加载一次）；
-只改客户端表现时刷新窗口即可。
+## 一次完整的交互
 
-## 配置
+1. 你发一条消息，等它答完。
+2. 回答结束、输入框为空 —— 上方出现灰字胶囊（例：`新增 publish.yml，实现 tag 触发自动发布`）。
+3. 按 Enter：这句话落进输入框，光标在末尾，**没有发送**。
+4. 想改就改，想发就再按一次 Enter。
+5. 不想要这版建议，直接删掉重写即可；下一轮结束后会重新生成。
 
-插件配置只有一格：
+## 载荷格式
 
-| 键 | 作用 |
-| --- | --- |
-| `hint` | 宿主写给界面的载荷（JSON 字符串），界面每秒读一次。人不填 |
-
-想关掉它，把 `dsh.profile.bundles` 里的 `dsh-saynext` 去掉即可。
-
-## 它怎么工作
-
-- **宿主**（`lib/index.js`）：监听 `session/event`，只在
-  `turn/end` 且 `reason.kind === 'completed'` 时动手；把最近 4 轮对话拼成一段
-  纯文本，走会话自己的 provider/model 调一次 `ctx.llm.stream`，把结果收拾成
-  一行（≤30 字、去引号、去前缀），存进内存小本子（每个会话一条，最多 8 条），
-  再用 `settings.update('saynext', { hint })` 写进配置。
-- **界面**（`lib/client.js`）：注册在 `conversation.input.overlay`
-  槽位上（session 级），每秒读一次 `hint`，只认 `sessionId` 与自己相同的那条；
-  草稿为空时显示，捕获阶段吃掉裸 Enter 并 `setDraft`。
-
-两边的唯一耦合就是 `hint` 这一格 JSON：
+宿主与界面之间只有一条通道：插件配置命名空间 `saynext` 的 `hint` 字段，内容是一段 JSON 字符串。
 
 ```json
-{ "rev": 4, "items": [{ "sessionId": "…", "text": "…", "turn": 25, "rev": 1, "at": 1794960197699 }] }
+{
+  "rev": 4,
+  "items": [
+    {
+      "sessionId": "session-…",
+      "text": "新增 publish.yml，实现 tag 触发自动发布",
+      "turn": 12,
+      "rev": 4,
+      "at": 1763624000000
+    }
+  ]
+}
 ```
 
-## 已知边界
+界面每秒读一次这份配置，只认 `sessionId` 与当前会话相同的那一条，所以多条会话同时跑着也互不串台。
 
-- 建议只对「这一轮正常收尾」触发；中断、报错收尾不生成。
-- 生成要一次模型调用，实测 1–3 秒；模型是推理型时会把预算花在思考上，
-  所以 `MAX_TOKENS` 给了 400，不是 96。
-- `hint` 是明文写在 `cordis.patch.yml` 里的，会包含你说过的话。介意的话
-  可以在设置里关掉插件，或把 `publish()` 改成写临时文件。
-- App 每次启动后要等第一条会话收尾才会有新建议。
+## 边界
+
+| 情况 | 行为 |
+| --- | --- |
+| 一轮没正常收尾（中断、报错） | 不生成建议，保留上一条 |
+| 正在流式输出 | 胶囊隐藏，不打断阅读 |
+| 输入框已有文字 | 胶囊隐藏，不挡你输入 |
+| 焦点不在输入框 | Enter 不拦截 |
+| 同时开多条会话 | 各自一条建议，最多缓存 8 条 |
+
+代价说清楚：**每轮结束后会多调一次模型**（取这段对话最近 4 轮、最多 4000 字，输出上限 400 token，20 秒超时），
+这部分 token 算在你自己头上。不想要就直接卸掉插件。
+
+## 开发
+
+```
+lib/index.js    宿主侧：监听 turn/end、调模型、写 hint
+lib/client.js   界面侧：读 hint、画胶囊、接管 Enter
+cordis.patch.yml 挂载声明
+assets/         截图
+```
+
+- 改 `lib/index.js`（宿主）要**重启 App** 才生效，宿主插件只在启动时加载一次。
+- 只改 `lib/client.js`（界面）刷新窗口即可。
+
+安装后可在 `~/.dsh/profiles/desktop/cordis.patch.yml` 里看到挂载块：
+
+```yaml
+- insert:
+  - id: saynext
+    name: dsh-saynext
+```
+
+排查问题时设 `DSH_SAYNEXT_TRACE=1` 再启动，宿主会把每一步写进 `/tmp/dsh-saynext.log`；默认不写文件。
 
 ## 许可
 
-MIT，见 [LICENSE](./LICENSE)。
+MIT，见 [LICENSE](LICENSE)。
