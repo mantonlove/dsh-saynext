@@ -1,0 +1,44 @@
+{
+  "name": "dsh-saynext",
+  "version": "0.1.0",
+  "description": "Turn-end next-line suggestions for the DSH composer: the host drafts what you will likely say next, Enter takes it into the input, a second Enter sends it.",
+  "type": "module",
+  "license": "MIT",
+  "author": "manton",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "composer",
+    "suggestion"
+  ],
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2 <0.4.0-0"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  }
+}
