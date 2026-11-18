@@ -116,6 +116,8 @@ assets/         截图
 ```
 
 - 改 `lib/index.js`（宿主）要**重启 App** 才生效，宿主插件只在启动时加载一次。
+- 事件监听挂在 `ctx` 与 `ctx.root` 两处：内核派发 `session/event` 时是从「进入会话那个 ctx」往祖先冒泡的，插件若只挂在自己的旁支 ctx 上，启动那一刻可能一条都收不到。挂到 root 一定收得到，重复收到由回合号去重。
+- 万一两个都收不到，8 秒和 30 秒各查一次：只要会话列表非空却没事件，就在 root 与会话存储上再补挂一次，并把 `bus silent` / `bus attach` 写进 trace。
 - 只改 `lib/client.js`（界面）刷新窗口即可。
 
 安装后可在 `~/.dsh/profiles/desktop/cordis.patch.yml` 里看到挂载块：

@@ -130,6 +130,8 @@ assets/          screenshot
 ```
 
 - Changing `lib/index.js` (host) needs an **app restart**; host plugins load once at startup.
+- The `session/event` listener is attached to both `ctx` and `ctx.root`: the kernel bubbles an event from the context that entered the session up through its ancestors, so a plugin hanging off a sibling context can receive nothing right after boot. `root` always receives; duplicates are dropped by turn number.
+- If neither hears anything, checks at 8 s and 30 s re-attach to `root` and the session store whenever sessions exist but no event arrived, logging `bus silent` / `bus attach` to the trace.
 - Changing only `lib/client.js` (UI) needs a window reload.
 
 After installation the mount block appears in `~/.dsh/profiles/desktop/cordis.patch.yml`:
