@@ -66,7 +66,8 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
     config:
       enabled: true            # 关掉就完全不调用模型
       cooldownMs: 0            # 同一会话两次请求的最小间隔，0 表示不限
-      minTranscriptChars: 40   # 对话正文短于这个字数就问，不值得
+      minTranscriptChars: 40   # 对话正文短于这个字数就不值得问
+      timeoutMs: 20000         # 单次生成超时；上游不理 abort 也会被硬性截断
 ```
 
 ## 载荷格式

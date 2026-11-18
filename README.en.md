@@ -76,6 +76,7 @@ All live in the mount block of `~/.dsh/profiles/desktop/cordis.patch.yml`; a win
       enabled: true            # false stops all model calls
       cooldownMs: 0            # minimum gap between two requests for the same session, 0 = no limit
       minTranscriptChars: 40   # skip turns whose transcript is shorter than this
+      timeoutMs: 20000         # per-generation timeout; enforced even if upstream ignores abort
 ```
 
 ## Payload
