@@ -6,19 +6,29 @@
 输入框留空时它才出现；按 **Enter** 把这句话搬进输入框（**不发送**），
 再按一次 **Enter** 才真正发出去。输入框里有字时它自动让开。
 
-## 装法（本地 link）
+## 装法
+
+已经发在 npm：<https://www.npmjs.com/package/dsh-saynext>
 
 ```bash
-# 1. 本仓库放进 profile 的依赖里
 cd ~/.dsh/profiles/desktop
-# package.json 的 dependencies 加：
-#   "dsh-saynext": "link:/绝对路径/到/dsh-saynext"
-# 再把它加进 dsh.profile.bundles
-pnpm install
+pnpm add dsh-saynext
 ```
 
-`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，不在 npm 上）。
-若装在别的目录、Node 解析不到它，就在本仓库里放一条软链：
+装完还要把 `dsh-saynext` 加进 `package.json` 的 `dsh.profile.bundles` 数组，再
+`pnpm install` 一次。上市之后直接在 **设置 → 插件市场** 搜 dsh-saynext 安装即可，
+bundles 由市场自动登记。
+
+本地改代码时用 link 更顺手：
+
+```bash
+# dependencies 里写（绝对路径）
+"dsh-saynext": "link:/绝对路径/到/dsh-saynext"
+```
+
+`lib/index.js` 依赖运行时的 `@deepseek-ai/schemastery`（DSH 自带，npm 上不发布，
+已在 package.json 里声明为 peer）。用 npm 装时它由 profile 的 node_modules 解析；
+用 link 装、且项目目录里 Node 解析不到时，补一条软链：
 
 ```bash
 mkdir -p node_modules/@deepseek-ai
