@@ -1,6 +1,6 @@
 {
   "name": "dsh-saynext",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn-end next-line suggestions for the DSH composer: the host drafts what you will likely say next, Enter takes it into the input, a second Enter sends it.",
   "type": "module",
   "license": "MIT",
