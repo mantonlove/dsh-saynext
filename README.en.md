@@ -101,7 +101,7 @@ current session, so several sessions running in parallel never see each other's 
   configured for that session in DSH** — nowhere else.
 - The result is stored as a small JSON string in the plugin's own namespace `saynext.hint`, inside the DSH profile
   configuration; nothing is written into your project directory.
-- The trace log is off by default. With `DSH_SAYNEXT_TRACE=1` it goes to `~/.dsh/saynext/trace.log`
+- The trace log is written by default to `~/.dsh/saynext/trace.log` (0600, rotated to `.1` past 512KB); set `DSH_SAYNEXT_TRACE=0` to disable it.
   (directory 0700, file 0600) and records **only the length of the suggestion, never its text**.
 
 ## Boundaries
@@ -140,7 +140,7 @@ After installation the mount block appears in `~/.dsh/profiles/desktop/cordis.pa
     name: dsh-saynext
 ```
 
-To debug, start with `DSH_SAYNEXT_TRACE=1` and the host writes each step to `~/.dsh/saynext/trace.log`
+To debug, read `~/.dsh/saynext/trace.log`; the host writes each step by default
 (0600, lengths only, no text); by default it writes nothing.
 
 ## License

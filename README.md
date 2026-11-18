@@ -89,7 +89,7 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 
 - 每次生成只把**这条会话最近 4 轮对话正文**（最多 4000 字）发给你在 DSH 里为该会话配置的 **provider / model**，不发往任何第三方地址。
 - 生成结果是存在插件自己的配置命名空间 `saynext.hint` 里的一小段 JSON，写在 DSH 的 profile 配置中，不落进项目目录。
-- 诊断日志默认关闭；`DSH_SAYNEXT_TRACE=1` 时写 `~/.dsh/saynext/trace.log`（目录 0700、文件 0600），而且**只记建议的长度，不记正文**。
+- 诊断日志默认写入 `~/.dsh/saynext/trace.log`（目录 0700、文件 0600，超过 512KB 轮转为 `.1`），**只记会话 id、回合号和建议长度，不记正文**；设 `DSH_SAYNEXT_TRACE=0` 可关闭。
 
 ## 边界
 
@@ -126,7 +126,7 @@ assets/         截图
     name: dsh-saynext
 ```
 
-排查问题时设 `DSH_SAYNEXT_TRACE=1` 再启动，宿主会把每一步写进 `~/.dsh/saynext/trace.log`（0600，只记长度不记正文）；默认不写文件。
+排查问题时直接看 `~/.dsh/saynext/trace.log`：宿主默认就把每一步写进去（0600，只记长度不记正文），不需要额外开关；不想留日志就设 `DSH_SAYNEXT_TRACE=0`。
 
 ## 许可
 
