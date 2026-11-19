@@ -3,24 +3,24 @@
 [中文](README.md) · [English](README.en.md)
 
 Adds a "next line" to the DSH composer: after each turn finishes normally, it guesses the sentence you are most
-likely to say next and leaves it just above the input box. Press **Enter** to drop it into the composer
+likely to say next and writes it straight into the composer. Press **Enter** to drop it into the composer
 (**nothing is sent**); press **Enter** again to send.
 
 ![suggestion / 建议内容](https://raw.githubusercontent.com/mantonlove/dsh-saynext/main/assets/saynext.png)
 
-> The grey line inside the red box is the suggestion. While it sits above the composer it takes no focus
+> The grey line inside the red box is the suggestion, drawn where the host's own placeholder sits. It takes no focus
 > and swallows no keys — you can ignore it entirely.
 
 ## What it does
 
 - When a turn ends **normally**, the host asks the model once, using the last 4 turns of that session, for
   one sentence you could send as-is.
-- When the composer is empty and no turn is running, that sentence shows as a grey pill above the composer. If the session also has a goal bar or a todo panel stacked there, the pill takes the row underneath them instead of overlapping.
+- When the composer is empty and no turn is running, that sentence is drawn inside the composer, on the editor's first line — the same spot the host's placeholder occupies, so it adds no extra height and never collides with a goal bar or a todo panel.
 - Enter while the composer has focus: the sentence is copied into the composer and **not sent**; a second
   Enter sends it.
-- Enter anywhere else (sidebar search, settings field, rename box): the plugin ignores the key, the pill stays put,
+- Enter anywhere else (sidebar search, settings field, rename box): the plugin ignores the key, the grey line stays put,
   and that control behaves exactly as before.
-- The pill hides itself while the composer already has text or while a turn is still streaming.
+- The line hides itself (and the host placeholder comes back) while the composer already has text or while a turn is still streaming.
 - When a new turn ends, the previous suggestion is taken down first and the new one appears once it is ready,
   so you never paste a sentence that already went stale.
 
@@ -58,7 +58,7 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 ## One full interaction
 
 1. You send a message and wait for the answer.
-2. The turn ends and the composer is empty — a grey pill appears above it (e.g. `新增 publish.yml，实现 tag 触发自动发布`).
+2. The turn ends and the composer is empty — a grey line appears inside it (e.g. `新增 publish.yml，实现 tag 触发自动发布`).
 3. Press Enter: the sentence lands in the composer, cursor at the end, **nothing sent**.
 4. Edit it or send it with a second Enter.
 5. Do not want it? Delete and type your own; the next turn produces a fresh one.
@@ -109,9 +109,9 @@ current session, so several sessions running in parallel never see each other's 
 | Situation | Behaviour |
 | --- | --- |
 | Turn did not end normally (aborted, failed) | no new suggestion; the next normal turn computes a fresh one |
-| A turn is streaming | pill hidden, no interference |
-| Composer already has text | pill hidden, no interference |
-| Focus outside the composer | the plugin does not intercept that key; the pill stays put |
+| A turn is streaming | line hidden, no interference |
+| Composer already has text | line hidden, placeholder restored, no interference |
+| Focus outside the composer | the plugin does not intercept that key; the line stays put |
 | Several sessions open | one suggestion each, up to 8 cached; a refreshed session moves to the back, so it is not evicted first |
 | Session declares no model (header has no provider/model) | no suggestion, no guessed default |
 | Upstream stream fails or times out | no suggestion for that turn — a half sentence is never pasted |
@@ -124,7 +124,7 @@ it, uninstall the plugin.
 
 ```
 lib/index.js     host: watch turn/end, call the model, write `hint`
-lib/client.js    UI: read `hint`, draw the pill, intercept Enter
+lib/client.js    UI: read `hint`, draw the line inside the editor, intercept Enter
 cordis.patch.yml mount declaration
 assets/          screenshot
 ```
