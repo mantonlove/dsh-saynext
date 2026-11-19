@@ -15,7 +15,7 @@ likely to say next and leaves it just above the input box. Press **Enter** to dr
 
 - When a turn ends **normally**, the host asks the model once, using the last 4 turns of that session, for
   one sentence you could send as-is.
-- When the composer is empty and no turn is running, that sentence shows as a grey pill above the composer.
+- When the composer is empty and no turn is running, that sentence shows as a grey pill above the composer. If the session also has a goal bar or a todo panel stacked there, the pill takes the row underneath them instead of overlapping.
 - Enter while the composer has focus: the sentence is copied into the composer and **not sent**; a second
   Enter sends it.
 - Enter anywhere else (sidebar search, settings field, rename box): the plugin ignores the key, the pill stays put,
