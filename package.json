@@ -31,7 +31,8 @@
     "cordis.patch.yml",
     "README.md",
     "LICENSE",
-    "README.en.md"
+    "README.en.md",
+    "screenshots.json"
   ],
   "engines": {
     "node": "^22.19 || >=24"
