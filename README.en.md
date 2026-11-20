@@ -10,8 +10,8 @@ Press Enter once to keep it, press again to send — it never decides for you, i
 ## What it solves
 
 Every time DSH finishes an answer you have to rebuild the next line: follow up, ask it to continue, or change direction.
-This plugin spends that idle moment guessing the line from the session's recent context,
-and writes it where the placeholder normally sits.
+This plugin spends that idle moment guessing the line from the session's recent context and writes it where the placeholder normally sits.
+It does not settle for agreement: when the assistant is waiting on a choice it picks one and says why; when it delivered a result it names the check that proves it; when it drifted it asks for a rework.
 
 - Right guess: one Enter and you skip the typing.
 - Wrong guess: ignore it, or just start typing — it steps aside on its own.
@@ -30,6 +30,7 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 - **Inside the input box**: same slot as the host placeholder, so it adds no height and never collides with the goal bar, todo list, or queued messages.
 - **Never steals focus or keys**: the grey line is display-only; clicks and ordinary typing pass through to the composer. The plugin takes over exactly one key: the Enter you press inside the composer to accept the suggestion.
 - **Per-session**: with several sessions open, each shows its own suggestion; session A's guess never lands in session B's composer.
+- **No filler**: agreement and paraphrase ("sure", "go ahead", "continue") are rejected and regenerated once; if the retry is still filler, that turn keeps no suggestion instead of parking a useless line.
 - **No stale text**: when a new turn ends, the previous suggestion is taken down first, then the new one appears.
 - **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
 - **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retry is not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped, plus one retry only if the generated line repeats the previous one.
