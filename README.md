@@ -72,6 +72,7 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 ```
 
 宿主侧改动要重启 App；只改界面（`lib/client.js`）刷新窗口即可。
+测试在仓库里：`npm test` 会跑四个套件（界面纯函数、单实例 DOM、多会话 DOM、生成侧闸门），Node 22 起直接执行，不需要装依赖。
 
 ## 怎么工作的
 

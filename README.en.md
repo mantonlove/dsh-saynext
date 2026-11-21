@@ -74,6 +74,7 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 ```
 
 Host-side changes need an app restart; UI-only changes (`lib/client.js`) need a window refresh.
+Tests live in the repo: `npm test` runs four suites (UI pure functions, single-instance DOM, multi-session DOM, generation-side gates) on Node 22+, with no dependencies to install.
 
 ## How it works
 
