@@ -273,14 +273,14 @@ async function run(texts, messages) {
   check('K28', calls.n === 1 && hint.includes('闸门顺序'), `calls=${calls.n} hint=${hint.slice(0, 40)}`)
 }
 
-// K29：三条都在谈插件自己（自指）→ 重问两次后仍降级采纳一条，不空着
+// K29：三条都在谈插件自己（自指）→ 这类不再降级采纳，整轮不出
 {
   const { calls, writes } = await run([
     '把灰字调成两行看看效果',
     '把灰字调成两行看看效果',
     '把灰字调成两行看看效果',
   ])
-  check('K29', calls.n === 3 && writes.length === 1, `calls=${calls.n} writes=${writes.length}`)
+  check('K29', calls.n === 3 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
 }
 
 // K30：编号、项目符号、超长解释行都要被剥掉，只留可发送的句子
@@ -302,6 +302,24 @@ async function run(texts, messages) {
   const { writes } = await run([{ text: '跑一遍全量测试确认零失败\n把日志最后 20 行贴出来\n半句', fail: true }])
   const hint = writes.at(-1)?.hint ?? ''
   check('K32', hint !== '' && !hint.includes('半句'), `hint=${hint.slice(0, 60)}`)
+}
+
+// K33：输出被截断且只有一段（没有换行结尾）→ 整段丢弃，不出建议
+{
+  const { calls, writes } = await run([{ text: '跑一遍全量测试确认零失败', fail: true }])
+  check('K33', calls.n === 1 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
+}
+
+// K34：候选复用只有 AI 说过的标识符 → 重问后仍复用则不写
+{
+  const { calls, writes } = await run(
+    ['把 trace.log 尾部 20 行贴出来', '把 trace.log 尾部 20 行贴出来'],
+    [
+      { role: 'user', content: [{ type: 'text', text: '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。' }] },
+      { role: 'assistant', content: [{ type: 'text', text: '改完了，顺手把 trace.log 的尾部留了一份。要我贴出来吗？' }] },
+    ],
+  )
+  check('K34', calls.n === 3 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
 }
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
