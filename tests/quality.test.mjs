@@ -10,7 +10,7 @@ const check = (id, cond, detail = '') => {
 }
 
 /** 每调用一次 llm.stream 就从队列里取一句（取完就不说话）。 */
-function makeCtx(texts) {
+function makeCtx(texts, messages) {
   const calls = { prompts: [], systems: [], n: 0 }
   const writes = []
   const handlers = []
@@ -19,7 +19,7 @@ function makeCtx(texts) {
     provider: 'prov',
     model: 'model-x',
     requestHeader: () => ({ config: { provider: 'prov', model: 'model-x' } }),
-    deriveMessages: () => [
+    deriveMessages: () => messages ?? [
       { role: 'user', content: [{ type: 'text', text: '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。' }] },
       { role: 'assistant', content: [{ type: 'text', text: '已经改完中文那份，还差英文里的软链目标检查。要我继续吗？' }] },
     ],
@@ -46,8 +46,8 @@ function makeCtx(texts) {
   return { ctx, calls, writes, fire: (turn = 7) => handlers.forEach((h) => h.name === 'session/event' && h.fn(session, { type: 'turn/end', data: { turn, reason: { kind: 'completed' } } })) }
 }
 
-async function run(texts) {
-  const { ctx, calls, writes, fire } = makeCtx(texts)
+async function run(texts, messages) {
+  const { ctx, calls, writes, fire } = makeCtx(texts, messages)
   mod.apply(ctx, {})
   fire()
   await new Promise((r) => setTimeout(r, 60))
@@ -224,6 +224,43 @@ async function run(texts) {
 {
   const { writes } = await run(['你来重启一下看看', '你可以先跑一遍看看'])
   check('K22', writes.length === 0, `写入次数=${writes.length}`)
+}
+
+// K25：建议复用「只有 AI 说过」的标识符 → 重问，改用不含该标识符的一句
+{
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: '把 README 的英文那份补齐' }] },
+    { role: 'assistant', content: [{ type: 'text', text: '已跑完 tests/quality.test.mjs，publish ok 之后 rev 回到 1。' }] },
+  ]
+  const { calls, writes } = await run(['再看 tests/quality.test.mjs 的输出', '把英文那份的安装三步补齐'], messages)
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K25a', calls.n === 2, `调用次数=${calls.n}`)
+  check('K25b', hint.includes('安装三步') && !hint.includes('quality.test'), `写入=${hint.slice(0, 60)}`)
+  check('K25c', (calls.prompts[1] ?? '').includes('标识符'), '重问时点明复用标识符')
+}
+
+// K26：同一个标识符用户自己也说过 → 放行，不重问
+{
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: 'tests/quality.test.mjs 里那条 K24 有问吗' }] },
+    { role: 'assistant', content: [{ type: 'text', text: '已跑完 tests/quality.test.mjs，publish ok 之后 rev 回到 1。' }] },
+  ]
+  const { calls, writes } = await run(['把 tests/quality.test.mjs 的 K24 再跑一遍'], messages)
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K26a', calls.n === 1, `调用次数=${calls.n}`)
+  check('K26b', hint.includes('K24'), `写入=${hint.slice(0, 60)}`)
+}
+
+// K27：建议在讲插件自己（用户没聊插件）→ 重问
+{
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: '把周报第三段补上上周的数据，顺便把第一段里那句结论改得更具体一点，别只写「效果不错」。' }] },
+    { role: 'assistant', content: [{ type: 'text', text: '已经补好第三段的两组同比数据，第一段的结论还留着原来的写法。' }] },
+  ]
+  const { calls, writes } = await run(['把灰字改成两行显示', '把周报第三段的数据补上'], messages)
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K27a', calls.n === 2, `调用次数=${calls.n}`)
+  check('K27b', hint.includes('周报'), `写入=${hint.slice(0, 60)}`)
 }
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
