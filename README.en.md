@@ -30,10 +30,10 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 - **Inside the input box**: same slot as the host placeholder, so it adds no height and never collides with the goal bar, todo list, or queued messages.
 - **Never steals focus or keys**: the grey line is display-only; clicks and ordinary typing pass through to the composer. The plugin takes over exactly one key: the Enter you press inside the composer to accept the suggestion.
 - **Per-session**: with several sessions open, each shows its own suggestion; session A's guess never lands in session B's composer.
-- **No filler**: pure acknowledgements ("sure", "go ahead", "continue", "got it") and lines with no concrete object are rejected and regenerated once; if the retry is still filler, that turn keeps no suggestion instead of parking a useless line. A restatement that names an object (e.g. "confirm the version is 0.1.6") is not filtered.
+- **No filler**: pure acknowledgements ("sure", "go ahead", "continue", "got it") lines with no concrete object, and lines copied out of the answer the assistant just wrote are rejected and regenerated once; if the retry is still filler, that turn keeps no suggestion instead of parking a useless line. A restatement that names an object (e.g. "confirm the version is 0.1.6") is not filtered.
 - **No stale text, no blank box**: a new suggestion replaces the old one as soon as it is ready. If a turn produces nothing usable (timeout, upstream error, filler output), the previous line stays instead of leaving the composer empty.
 - **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
-- **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retry is not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped. Two cases trigger one more call: filler detected, and a line identical to the previous one; when both happen, a turn can cost three calls before the plugin gives up.
+- **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped. Two cases trigger one more call: filler detected, and a line identical to the previous one; when both happen, a turn can cost three calls before the plugin gives up.
 - **Auditable**: the trace log is on by default; it mainly records session id, turn number, suggestion length, the chosen provider / model and a few status lines — never the conversation text.
 
 ## Install (the npm registry; the DSH profile itself uses pnpm)
@@ -98,7 +98,7 @@ In the mount block of `~/.dsh/profiles/desktop/cordis.patch.yml`:
     name: dsh-saynext
     config:
       enabled: true            # false = never call the model
-      cooldownMs: 0            # minimum gap between the first requests of consecutive turns of the same session, measured from the start of the turn's attempt; the same-turn retry is not gated; 0 = no limit
+      cooldownMs: 0            # minimum gap between the first requests of consecutive turns of the same session, measured from the start of the turn's attempt; the same-turn retries are not gated; 0 = no limit
       minTranscriptChars: 40   # shorter transcripts are not worth asking about
       timeoutMs: 20000         # per-generation timeout; when it fires the plugin stops waiting and drops the result, without relying on upstream honouring abort
 ```
