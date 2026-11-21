@@ -31,7 +31,12 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 - **Never steals focus or keys**: the grey line is display-only; clicks and ordinary typing pass through to the composer. The plugin takes over exactly one key: the Enter you press inside the composer to accept the suggestion.
 - **Per-session**: with several sessions open, each shows its own suggestion; session A's guess never lands in session B's composer.
 - **No filler**: pure acknowledgements ("sure", "go ahead", "continue", "got it"), lines with no concrete object, lines copied out of the answer the assistant just wrote, and lines that start with "you" — the voice the assistant uses when talking to you, not something you would type — are rejected and regenerated with the reason. If the retry is still filler, that turn keeps no suggestion instead of parking a useless line. A restatement that names an object (e.g. "confirm the version is 0.1.6") is not filtered.
-- **No stale text, no blank box**: a new suggestion replaces the old one as soon as it is ready. If a turn produces nothing usable (timeout, upstream error, filler output), the previous line stays instead of leaving the composer empty.
+- **Bound to a turn**: every suggestion remembers the turn it belongs to. It shows only when it belongs to the
+  session's latest turn, that turn ended normally, and the composer is empty. A new turn invalidates the old line
+  immediately (read from the host timeline, not from polling); a failed, interrupted or timed-out turn shows the
+  original placeholder instead of an older sentence. Enter re-checks the same condition.
+- **One call per finished turn**: a restart or hot reload never re-runs the model; it only shows a cache that is
+  still valid for the current turn, otherwise it waits for the next normal finish.
 - **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
 - **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped. Four cases trigger a retry with the reason attached (at most two retries): filler, a line identical to the previous one, a copy of the assistant's own words, and a line starting with "you". A turn costs at most three calls before the plugin gives up.
 - **Auditable**: the trace log is on by default; it mainly records session id, turn number, suggestion length, the chosen provider / model and a few status lines — never the conversation text.
