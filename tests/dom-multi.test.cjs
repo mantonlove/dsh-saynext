@@ -295,9 +295,10 @@ async function main() {
   check('I5', filled.some(([sid, t]) => sid === 's1' && t === payload.items[0].text) && ev.prevented === true && ev.stopped === true, `filled=${JSON.stringify(filled)}`)
 
   // 卸载后监听器全部撤掉
-  const before = windowListeners.filter((l) => l.type === 'keydown').length
+  // 基线取自运行时，不写死数字：此时 b 实例还挂着，所以卸载 d 之后应该只剩它的那一个。
+  const beforeKeydown = windowListeners.filter((l) => l.type === 'keydown').length
   unmount(id)
-  check('I6', windowListeners.filter((l) => l.type === 'keydown').length === before - 1, `keydown 监听=${windowListeners.filter((l) => l.type === 'keydown').length} 之前=${before}`)
+  check('I6', windowListeners.filter((l) => l.type === 'keydown').length === beforeKeydown - 1, `keydown 监听=${windowListeners.filter((l) => l.type === 'keydown').length} 之前=${beforeKeydown}`)
 
   unmount(ib)
   check('I7', liveIntervals.size === 0, `留下的定时器=${liveIntervals.size}`)
