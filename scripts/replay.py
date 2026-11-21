@@ -120,6 +120,13 @@ def call(system, prompt, model):
 
 target = int(sys.argv[1]) if len(sys.argv) > 1 else 90
 msgs = messages_until_turn_end(target)
+
+# 把这段对话导出，供 scripts/rank.mjs 用真实上下文复跑排序（echo/reuse/selftalk 依赖它）。
+_out = os.environ.get('REPLAY_MESSAGES_OUT')
+if _out:
+    import json as _json
+    with open(_out, 'w', encoding='utf-8') as _f:
+        _json.dump([{'role': r, 'text': t} for r, t in msgs], _f, ensure_ascii=False)
 print(f'turn {target} 结束前的消息数: {len(msgs)}')
 prompt, chars = frame(msgs)
 print(f'prompt 字符数: {chars}')
