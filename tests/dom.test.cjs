@@ -22,7 +22,6 @@ function node(tag) {
     removeAttribute: (k) => attrs.delete(k),
     getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
     hasAttribute: (k) => attrs.has(k),
-    getBoundingClientRect() { return { left: 100, top: 300, width: 600, height: 24, right: 700, bottom: 324, x: 100, y: 300 } },
     appendChild(child) { this.children.push(child); child.parentElement = this; return child },
     contains(other) { for (let n = other; n; n = n.parentElement) if (n === this) return true; return false },
     closest(sel) { const key = sel.replace(/[[\]]/g, ''); for (let n = this; n; n = n.parentElement) if (n.hasAttribute(key)) return n; return null },
@@ -130,14 +129,8 @@ function clear(nodeEl) {
   nodeEl.children = []
 }
 
-function purgePortals() {
-  // 灰字挂在 body 上，模拟 React 的重渲染回收。
-  document.body.children = document.body.children.filter((c) => !(c.getAttribute && c.getAttribute('data-saynext') === 'ghost'))
-}
-
 function rerender() {
   hookIndex = 0
-  purgePortals()
   clear(mountPoint)
   const tree = React.createElement(SlotComponent, slotProps)
   mount(tree, mountPoint)
@@ -147,7 +140,6 @@ function rerender() {
 function renderOnce() {
   hookIndex = 0
   queue = []
-  purgePortals()
   clear(mountPoint)
   const tree = React.createElement(SlotComponent, slotProps)
   mount(tree, mountPoint)
@@ -189,7 +181,6 @@ let ok = 0, bad = 0
 const check = (id, cond, detail) => { if (cond) { ok += 1; console.log(`${id} PASS${detail ? ' ' + detail : ''}`) } else { bad += 1; console.log(`${id} FAIL ${detail ?? ''}`) } }
 
 const findGhost = (n, out = []) => {
-  // 灰字现在挂在 document.body 上（顶层固定定位），所以一律从 body 开始找。
   if (!n) return out
   if (n.getAttribute && n.getAttribute('data-saynext') === 'ghost') out.push(n)
   for (const c of n.children ?? []) findGhost(c, out)
@@ -224,11 +215,11 @@ async function main() {
   await new Promise((r) => setTimeout(r, 40))
 
   check('H0', capturedMeta?.name === 'conversation.input.overlay' && capturedMeta?.id === 'saynext-line', JSON.stringify(capturedMeta))
-  const ghosts = findGhost(document.body)
+  const ghosts = findGhost(card)
   check('H1', ghosts.length === 1, `ghost=${ghosts.length}`)
-  check('H2', ghosts[0]?.parentElement === document.body, `父节点=${ghosts[0]?.parentElement?.tagName}`)
-  check('H3', ghosts[0]?.style.position === 'fixed' && ghosts[0]?.style.left === '100px' && ghosts[0]?.style.width === '600px', `pos=${ghosts[0]?.style.position} left=${ghosts[0]?.style.left}`)
-  check('H4', ghosts[0]?.style.pointerEvents === 'none' && String(ghosts[0]?.style.opacity) === '0.55', `opacity=${ghosts[0]?.style.opacity}`)
+  check('H2', ghosts[0]?.parentElement === grow, `父节点=${ghosts[0]?.parentElement?.tagName}`)
+  check('H3', ghosts[0]?.style.inset === '4px 8px auto 14px', `inset=${ghosts[0]?.style.inset}`)
+  check('H4', ghosts[0]?.style.pointerEvents === 'none' && ghosts[0]?.style.opacity === 0.5)
   check('H5', card.hasAttribute('data-saynext-ghost'), '卡片打上隐藏宿主占位符的标记')
   check('H6', (ghosts[0]?.textContent ?? '') === payload.items[0].text, `text=${ghosts[0]?.textContent}`)
 
@@ -249,40 +240,40 @@ async function main() {
   // 草稿非空 → 不画灰字、不挂标记
   mountSlot({ d: '已经有字了' })
   await new Promise((r) => setTimeout(r, 40))
-  check('H10', findGhost(document.body).length === 0 && !card.hasAttribute('data-saynext-ghost'), '草稿非空时不显示')
+  check('H10', findGhost(card).length === 0 && !card.hasAttribute('data-saynext-ghost'), '草稿非空时不显示')
 
   // 会话运行中 → 不画
   mountSlot({ r: true })
   await new Promise((r) => setTimeout(r, 40))
-  check('H11', findGhost(document.body).length === 0, '运行中不显示')
+  check('H11', findGhost(card).length === 0, '运行中不显示')
 
   // H12：新一轮开始（最新一轮还没结束）→ 旧建议立刻失效
 timeline = timelineOf(4, 'open', 'completed')
 mountSlot({})
 await new Promise((r) => setTimeout(r, 40))
-check('H12', findGhost(document.body).length === 0 && !card.hasAttribute('data-saynext-ghost'), `新一轮开始后 ghost=${findGhost(document.body).length}`)
+check('H12', findGhost(card).length === 0 && !card.hasAttribute('data-saynext-ghost'), `新一轮开始后 ghost=${findGhost(card).length}`)
 
 // H13：最新一轮结束了，但是失败收场 → 同样不显示
 timeline = timelineOf(3, 'closed', 'error')
 mountSlot({})
 await new Promise((r) => setTimeout(r, 40))
-check('H13', findGhost(document.body).length === 0, `失败收尾 ghost=${findGhost(document.body).length}`)
+check('H13', findGhost(card).length === 0, `失败收尾 ghost=${findGhost(card).length}`)
 
 // H14：最新一轮正常结束 → 恢复显示
 timeline = timelineOf(3, 'closed', 'completed')
 mountSlot({})
 await new Promise((r) => setTimeout(r, 40))
-check('H14', findGhost(document.body).length === 1, `正常收尾 ghost=${findGhost(document.body).length}`)
+check('H14', findGhost(card).length === 1, `正常收尾 ghost=${findGhost(card).length}`)
 
 // H15：宿主没给 useConversation → 宁可不显示（fail closed）
 mountSlot({ noConv: true })
 await new Promise((r) => setTimeout(r, 40))
-check('H15', findGhost(document.body).length === 0 && !card.hasAttribute('data-saynext-ghost'), `缺入口 ghost=${findGhost(document.body).length}`)
+check('H15', findGhost(card).length === 0 && !card.hasAttribute('data-saynext-ghost'), `缺入口 ghost=${findGhost(card).length}`)
 
 // H16：未知状态（unknown）也不算正常结束
 mountSlot({ tl: timelineOf(3, 'unknown', 'completed') })
 await new Promise((r) => setTimeout(r, 40))
-check('H16', findGhost(document.body).length === 0, `unknown ghost=${findGhost(document.body).length}`)
+check('H16', findGhost(card).length === 0, `unknown ghost=${findGhost(card).length}`)
 
 // H17：轮次失效后按 Enter 不能把旧句子填进去
 timeline = timelineOf(4, 'open', 'completed')
@@ -300,7 +291,7 @@ await new Promise((r) => setTimeout(r, 40))
 const before18 = filled.length
 const ev18 = { key: 'Enter', shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, isComposing: false, prevented: false, preventDefault() { this.prevented = true }, stopPropagation() {} }
 for (const l of [...windowListeners]) if (l.type === 'keydown') l.fn(ev18)
-check('H18', findGhost(document.body).length === 0 && filled.length === before18 && ev18.prevented === false, `ghost=${findGhost(document.body).length} filled+${filled.length - before18}`)
+check('H18', findGhost(card).length === 0 && filled.length === before18 && ev18.prevented === false, `ghost=${findGhost(card).length} filled+${filled.length - before18}`)
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
   process.exit(bad === 0 ? 0 : 1)

@@ -89,10 +89,10 @@ check('G2d', t.ghostVisible('下一句', '', true) === false, '运行中不显�
 check('G2e', t.ghostVisible('', '', false) === false)
 
 // G3 位置与样式：与宿主占位符同一组 inset，不可点、单行省略
-check('G3a', t.GHOST.position === 'fixed' && t.GHOST.zIndex > 0, `position=${t.GHOST.position} z=${t.GHOST.zIndex}`)
-check('G3b', t.GHOST.pointerEvents === 'none' && t.GHOST.userSelect === 'none')
+check('G3a', t.GHOST.inset === '4px 8px auto 14px', `inset=${t.GHOST.inset}`)
+check('G3b', t.GHOST.position === 'absolute' && t.GHOST.pointerEvents === 'none')
 check('G3c', t.GHOST.whiteSpace === 'nowrap' && t.GHOST.textOverflow === 'ellipsis')
-check('G3d', typeof t.measureGhost === 'function', 'measureGhost 已导出')
+check('G3d', t.GHOST.opacity === 0.5, `opacity=${t.GHOST.opacity}`)
 
 // G4 找承载层：占位符的父节点
 const grow = makeNode('div')

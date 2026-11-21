@@ -25,7 +25,6 @@ function node(tag) {
     removeAttribute(k) { attrs.delete(k) },
     getAttribute(k) { return attrs.has(k) ? attrs.get(k) : null },
     hasAttribute(k) { return attrs.has(k) },
-    getBoundingClientRect() { return { left: 100, top: 300, width: 600, height: 24, right: 700, bottom: 324, x: 100, y: 300 } },
     appendChild(child) { this.children.push(child); child.parentElement = this; return child },
     removeChild(child) { this.children = this.children.filter((c) => c !== child); child.parentElement = null },
     contains(other) { for (let n = other; n; n = n.parentElement) if (n === this) return true; return false },
@@ -161,7 +160,6 @@ const windowStub = {
 }
 const liveIntervals = new Set()
 const sandbox = {
-  getComputedStyle: () => ({ font: '13px system-ui', lineHeight: '20px', color: 'rgb(20, 24, 32)' }),
   window: windowStub,
   document,
   console,
@@ -226,14 +224,11 @@ function mountSlot(sessionId, cardEl, opts = {}) {
 }
 
 const findGhost = (n, out = []) => {
-  // 灰字挂在 document.body（顶层固定定位），一律从 body 开始找。
   if (!n) return out
   if (n.getAttribute && n.getAttribute('data-saynext') === 'ghost') out.push(n)
   for (const c of n.children ?? []) findGhost(c, out)
   return out
 }
-const ghosts = () => findGhost(document.body)
-const byText = (text) => ghosts().filter((g) => g.textContent === text)
 
 let ok = 0, bad = 0
 const check = (id, cond, detail) => { if (cond) { ok += 1; console.log(`${id} PASS${detail ? ' ' + detail : ''}`) } else { bad += 1; console.log(`${id} FAIL ${detail ?? ''}`) } }
@@ -250,31 +245,31 @@ async function main() {
   await wait()
 
   check('I0', capturedMeta?.id === 'saynext-line', JSON.stringify(capturedMeta))
-  const ga = byText(payload.items[0].text)
-  const gb = byText(payload.items[1].text)
-  check('I1a', ga.length === 1 && ga[0].style.position === 'fixed', `a.ghost=${ga.length} pos=${ga[0]?.style.position}`)
-  check('I1b', gb.length === 1 && gb[0].parentElement === document.body, `b.ghost=${gb.length}`)
+  const ga = findGhost(a.card)
+  const gb = findGhost(b.card)
+  check('I1a', ga.length === 1 && ga[0].parentElement === a.grow, `a.ghost=${ga.length}`)
+  check('I1b', gb.length === 1 && gb[0].parentElement === b.grow, `b.ghost=${gb.length}`)
   check('I1c', ga[0].textContent === payload.items[0].text && gb[0].textContent === payload.items[1].text, `a=${ga[0].textContent} b=${gb[0].textContent}`)
   check('I1d', a.card.hasAttribute('data-saynext-ghost') && b.card.hasAttribute('data-saynext-ghost'), '两张卡片各自打标记')
 
   // 卸载 a：只清 a 的残留
   unmount(ia)
-  check('I2a', byText(payload.items[0].text).length === 0, 'a 的灰字已移除')
+  check('I2a', findGhost(a.card).length === 0, 'a 的灰字已移除')
   check('I2b', !a.card.hasAttribute('data-saynext-ghost'), 'a 的属性已移除')
-  check('I2c', byText(payload.items[1].text).length === 1 && b.card.hasAttribute('data-saynext-ghost'), 'b 不受影响')
+  check('I2c', findGhost(b.card).length === 1 && b.card.hasAttribute('data-saynext-ghost'), 'b 不受影响')
 
   // 没有 setDraft：不画
   const c = makeCard()
   const ic = mountSlot('s1', c.card, { setDraft: null })
   await wait()
-  check('I3', byText(payload.items[0].text).length === 0 && ghosts().length === 1 && !c.card.hasAttribute('data-saynext-ghost'), '缺少 setDraft 时不新增灰字')
+  check('I3', findGhost(c.card).length === 0 && !c.card.hasAttribute('data-saynext-ghost'), '缺少 setDraft 时不画')
   unmount(ic)
 
   // 承载层被宿主换掉：指针里的旧节点脱离文档后应重新定位
   const d = makeCard()
   const id = mountSlot('s1', d.card)
   await wait()
-  check('I4a', byText(payload.items[0].text).length === 1, '初始有灰字')
+  check('I4a', findGhost(d.card).length === 1, '初始有灰字')
   const oldGrow = d.grow
   oldGrow.isConnected = false
   d.card.removeChild(oldGrow)
@@ -284,8 +279,8 @@ async function main() {
   // 让插件里的复查定时器跑一次
   for (const { fn } of id.intervals) fn()
   await wait()
-  const gd = byText(payload.items[0].text)
-  check('I4b', gd.length === 1 && gd[0].style.position === 'fixed', `换层后仍在，ghost=${gd.length}`)
+  const gd = findGhost(d.card)
+  check('I4b', gd.length === 1 && gd[0].parentElement === newGrow, `重新定位到新容器，ghost=${gd.length}`)
 
   // Enter：只填草稿，不发送
   d.card.querySelector('[data-composer-placeholder]')
@@ -295,10 +290,9 @@ async function main() {
   check('I5', filled.some(([sid, t]) => sid === 's1' && t === payload.items[0].text) && ev.prevented === true && ev.stopped === true, `filled=${JSON.stringify(filled)}`)
 
   // 卸载后监听器全部撤掉
-  // 基线取自运行时，不写死数字：此时 b 实例还挂着，所以卸载 d 之后应该只剩它的那一个。
-  const beforeKeydown = windowListeners.filter((l) => l.type === 'keydown').length
+  const before = windowListeners.length
   unmount(id)
-  check('I6', windowListeners.filter((l) => l.type === 'keydown').length === beforeKeydown - 1, `keydown 监听=${windowListeners.filter((l) => l.type === 'keydown').length} 之前=${beforeKeydown}`)
+  check('I6', windowListeners.filter((l) => l.type === 'keydown').length === before - 1, `keydown 监听=${windowListeners.filter((l) => l.type === 'keydown').length}`)
 
   unmount(ib)
   check('I7', liveIntervals.size === 0, `留下的定时器=${liveIntervals.size}`)
