@@ -54,5 +54,8 @@
         "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
+  },
+  "scripts": {
+    "test": "node tests/ghost.test.cjs && node tests/dom.test.cjs && node tests/dom-multi.test.cjs && node tests/quality.test.mjs"
   }
 }

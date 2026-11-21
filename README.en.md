@@ -39,7 +39,7 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
   still valid for the current turn, otherwise it waits for the next normal finish. Retries during generation
   are described under cost control below — a turn costs at most three calls.
 - **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
-- **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped. Four cases trigger a retry with the reason attached (at most two retries): filler, a line identical to the previous one, a copy of the assistant's own words, and a line starting with "you". A turn costs at most three calls before the plugin gives up.
+- **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout. A finished, non-skipped turn sends one request. Four cases trigger a retry with the reason attached, at most two retries: filler, a line identical to the previous one, a copy of the assistant's own words, and a line starting with "you". So a turn costs at most three calls before the plugin gives up.
 - **Auditable**: the trace log is on by default; it mainly records session id, turn number, suggestion length, the chosen provider / model and a few status lines — never the conversation text.
 
 ## Install (the npm registry; the DSH profile itself uses pnpm)
