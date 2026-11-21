@@ -32,11 +32,14 @@ function makeCtx(texts, messages) {
       stream: (params) => {
         calls.prompts.push(params.messages?.[0]?.content?.[0]?.text ?? '')
         calls.systems.push(params.system)
-        const text = texts[Math.min(calls.n, texts.length - 1)]
+        const entry = texts[Math.min(calls.n, texts.length - 1)]
+        const text = entry !== null && typeof entry === 'object' ? entry.text : entry
+        const fail = entry !== null && typeof entry === 'object' && entry.fail === true
         calls.n += 1
         return (async function* () {
           if (text !== null) yield { type: 'text-delta', text }
-          yield { type: 'finish', reason: { kind: 'stop' } }
+          if (fail) yield { type: 'error', reason: { kind: 'aborted' } }
+          else yield { type: 'finish', reason: { kind: 'stop' } }
         })()
       },
     },
@@ -285,6 +288,20 @@ async function run(texts, messages) {
   const { calls, writes } = await run(['1. 把 `README.en.md` 里的软链段补上\n- 2）继续\n说明：这一条是解释，不该被当成候选'])
   const hint = writes.at(-1)?.hint ?? ''
   check('K30', calls.n === 1 && hint.includes('软链段'), `calls=${calls.n} hint=${hint.slice(0, 40)}`)
+}
+
+// K31：首轮只剩「带毛病但分高」的候选，重问给出「干净但分低」的 → 采用干净的
+{
+  const { calls, writes } = await run(['把插件的日志调一下', '检查一下'])
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K31', calls.n === 2 && hint.includes('检查一下'), `calls=${calls.n} hint=${hint.slice(0, 60)}`)
+}
+
+// K32：输出被截断（末行没有换行结尾）→ 末尾半句丢掉，只用完整行
+{
+  const { writes } = await run([{ text: '跑一遍全量测试确认零失败\n把日志最后 20 行贴出来\n半句', fail: true }])
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K32', hint !== '' && !hint.includes('半句'), `hint=${hint.slice(0, 60)}`)
 }
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)

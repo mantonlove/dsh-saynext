@@ -132,7 +132,7 @@ The plugin declares the DSH range `>=0.2.0-rc.2 <0.4.0-0`; DSH outside that rang
 | No conversation timeline available (version mismatch or a changed entry point) | The grey line is not drawn: better an empty composer than a line nobody can prove is current |
 | Several sessions at once | One suggestion per session, up to 8 cached; recently updated ones move to the back of the eviction queue |
 | Session declares no provider / model | Nothing is generated; no default is invented |
-| Upstream error or timeout | No suggestion for that turn; no partial sentence is inserted |
+| Upstream error or timeout | Complete lines are still used as candidates; if none is complete, the placeholder stays (the previous turn's line has already expired with its turn) |
 | The UI cannot set the draft | The grey line is not drawn at all (showing it would be worse) |
 | Plugin disabled, cooldown not elapsed, or transcript too short | Skipped entirely; no model call |
 | The previous suggestion for this session is still being generated | Skipped; nothing is queued and no parallel call is made |
