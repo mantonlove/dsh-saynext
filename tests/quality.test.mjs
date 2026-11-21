@@ -192,10 +192,10 @@ async function run(texts, messages) {
   check('K19', hint.includes('跑一遍链接检查脚本'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K20：复述两次 → 整轮不写
+// K20：复述两次 → 降级采纳（先保证有建议，原因记进日志）
 {
   const { writes } = await run(['还差英文里的软链目标检查', '还差英文里的软链目标检查'])
-  check('K20', writes.length === 0, `写入次数=${writes.length}`)
+  check('K20', writes.length === 1, `写入次数=${writes.length}`)
 }
 
 // K23：把用户刚说过的话原样端回来 → 重问，改用新的下一步
@@ -206,11 +206,11 @@ async function run(texts, messages) {
   check('K23', hint.includes('pnpm pack'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K24：两次都只是复述用户的话 → 整轮不写
+// K24：两次都只是复述用户的话 → 降级采纳
 {
   const said = '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。'
   const { writes } = await run([said, said])
-  check('K24', writes.length === 0, `写入次数=${writes.length}`)
+  check('K24', writes.length === 1, `写入次数=${writes.length}`)
 }
 
 // K21：以「你」开头（AI 对用户说话的口吻）→ 重问，改用用户的口令
@@ -220,10 +220,10 @@ async function run(texts, messages) {
   check('K21', hint.includes('重启后查一遍 trace.log'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K22：连续两次都是「你来…」→ 整轮不写
+// K22：连续两次都是「你来…」→ 降级采纳
 {
   const { writes } = await run(['你来重启一下看看', '你可以先跑一遍看看'])
-  check('K22', writes.length === 0, `写入次数=${writes.length}`)
+  check('K22', writes.length === 1, `写入次数=${writes.length}`)
 }
 
 // K25：建议复用「只有 AI 说过」的标识符 → 重问，改用不含该标识符的一句
