@@ -263,5 +263,29 @@ async function run(texts, messages) {
   check('K27b', hint.includes('周报'), `写入=${hint.slice(0, 60)}`)
 }
 
+// K28：一次给三条，只有中间那条可用 → 选它，且只调用一次
+{
+  const { calls, writes } = await run(['好的\n把 `lib/index.js` 的闸门顺序调一下\n继续'])
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K28', calls.n === 1 && hint.includes('闸门顺序'), `calls=${calls.n} hint=${hint.slice(0, 40)}`)
+}
+
+// K29：三条都在谈插件自己（自指）→ 重问两次后仍降级采纳一条，不空着
+{
+  const { calls, writes } = await run([
+    '把灰字调成两行看看效果',
+    '把灰字调成两行看看效果',
+    '把灰字调成两行看看效果',
+  ])
+  check('K29', calls.n === 3 && writes.length === 1, `calls=${calls.n} writes=${writes.length}`)
+}
+
+// K30：编号、项目符号、超长解释行都要被剥掉，只留可发送的句子
+{
+  const { calls, writes } = await run(['1. 把 `README.en.md` 里的软链段补上\n- 2）继续\n说明：这一条是解释，不该被当成候选'])
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K30', calls.n === 1 && hint.includes('软链段'), `calls=${calls.n} hint=${hint.slice(0, 40)}`)
+}
+
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
 process.exit(bad === 0 ? 0 : 1)
