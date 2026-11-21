@@ -35,8 +35,9 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
   session's latest turn, that turn ended normally, and the composer is empty. A new turn invalidates the old line
   immediately (read from the host timeline, not from polling); a failed, interrupted or timed-out turn shows the
   original placeholder instead of an older sentence. Enter re-checks the same condition.
-- **One call per finished turn**: a restart or hot reload never re-runs the model; it only shows a cache that is
-  still valid for the current turn, otherwise it waits for the next normal finish.
+- **A restart costs nothing**: a restart or hot reload never re-runs the model; it only shows a cache that is
+  still valid for the current turn, otherwise it waits for the next normal finish. Retries during generation
+  are described under cost control below — a turn costs at most three calls.
 - **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
 - **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout — one model call per finished turn that is not skipped. Four cases trigger a retry with the reason attached (at most two retries): filler, a line identical to the previous one, a copy of the assistant's own words, and a line starting with "you". A turn costs at most three calls before the plugin gives up.
 - **Auditable**: the trace log is on by default; it mainly records session id, turn number, suggestion length, the chosen provider / model and a few status lines — never the conversation text.
@@ -127,6 +128,7 @@ The plugin declares the DSH range `>=0.2.0-rc.2 <0.4.0-0`; DSH outside that rang
 | A turn is streaming | The grey line hides; reading is not interrupted |
 | The composer already has text | The grey line hides and the placeholder returns |
 | Focus is not in the composer | The key is not intercepted; the grey line stays put |
+| No conversation timeline available (version mismatch or a changed entry point) | The grey line is not drawn: better an empty composer than a line nobody can prove is current |
 | Several sessions at once | One suggestion per session, up to 8 cached; recently updated ones move to the back of the eviction queue |
 | Session declares no provider / model | Nothing is generated; no default is invented |
 | Upstream error or timeout | No suggestion for that turn; no partial sentence is inserted |
