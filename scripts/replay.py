@@ -150,5 +150,9 @@ for label, sysprompt in pairs:
         out = call(sysprompt, prompt, 'DeepSeek-V4.1-Flash-1017')
         hit = 'trace' in out.lower()
         hits += hit
-        print(f'[{label}{i+1}] {out or "<空>"} | trace={hit}')
+        if os.environ.get('REPLAY_JSON') == '1':
+            import json as _json
+            print('JSON ' + _json.dumps({'i': i + 1, 'out': out, 'trace': hit}, ensure_ascii=False))
+        else:
+            print(f'[{label}{i+1}] {out or "<空>"} | trace={hit}')
     print(f'[{label}] 含 trace 次数 {hits}/{sample_n}')
