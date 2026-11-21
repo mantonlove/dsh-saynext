@@ -198,6 +198,21 @@ async function run(texts) {
   check('K20', writes.length === 0, `写入次数=${writes.length}`)
 }
 
+// K23：把用户刚说过的话原样端回来 → 重问，改用新的下一步
+{
+  const said = '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。'
+  const { writes } = await run([said, '跑 pnpm pack 核对 8 个文件'])
+  const hint = writes.at(-1)?.hint ?? ''
+  check('K23', hint.includes('pnpm pack'), `写入=${hint.slice(0, 60)}`)
+}
+
+// K24：两次都只是复述用户的话 → 整轮不写
+{
+  const said = '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。'
+  const { writes } = await run([said, said])
+  check('K24', writes.length === 0, `写入次数=${writes.length}`)
+}
+
 // K21：以「你」开头（AI 对用户说话的口吻）→ 重问，改用用户的口令
 {
   const { writes } = await run(['你来重启，测试已全 PASS，重启后核对载荷', '重启后查一遍 trace.log 里有没有 publish 失败'])
