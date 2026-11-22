@@ -1,5 +1,8 @@
 import { pathToFileURL } from 'node:url'
 
+// 打开测试钩子：tidy / judgeSuggestion 等内部函数通过 globalThis.__saynextTest 暴露
+process.env.DSH_SAYNEXT_TEST = '1'
+
 const file = new URL('../lib/index.js', import.meta.url).href
 const mod = await import(file)
 
@@ -320,6 +323,14 @@ async function run(texts, messages) {
     ],
   )
   check('K34', calls.n === 3 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
+}
+
+// K35：最终句子上限——95 字输入应被切成正好 90 字
+{
+  const tidy = globalThis.__saynextTest?.tidy
+  const long = '跑一遍测试'.repeat(19) // 5 × 19 = 95 字，无标点，不会触发句级切分
+  const cut = typeof tidy === 'function' ? tidy(long) : ''
+  check('K35', typeof tidy === 'function' && long.length === 95 && cut.length === 90, `in=${long.length} out=${cut.length}`)
 }
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
