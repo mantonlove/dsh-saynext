@@ -325,6 +325,15 @@ async function run(texts, messages) {
   check('K34', calls.n === 3 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
 }
 
+// K36：95 字且第 30 字是句号 → 先按句号切走第一句（30 字），截断不该把句号连同后半句一起吞掉
+{
+  const tidy = globalThis.__saynextTest?.tidy
+  const first = '甲'.repeat(29) + '。'
+  const long = first + '乙'.repeat(65) // 30 + 65 = 95 字
+  const cut = typeof tidy === 'function' ? tidy(long) : ''
+  check('K36', long.length === 95 && cut.length === 30 && cut === first, `in=${long.length} out=${cut.length} 尾部=${cut.slice(-1)}`)
+}
+
 // K35：最终句子上限——95 字输入应被切成正好 90 字
 {
   const tidy = globalThis.__saynextTest?.tidy
