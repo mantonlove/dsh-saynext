@@ -334,6 +334,14 @@ async function run(texts, messages) {
   check('K36', long.length === 95 && cut.length === 30 && cut === first, `in=${long.length} out=${cut.length} 尾部=${cut.slice(-1)}`)
 }
 
+// K37：首句本身超过 90 字（后面还跟一句）→ 仍要被截到 90，切句不能绕过上限
+{
+  const tidy = globalThis.__saynextTest?.tidy
+  const long = '甲'.repeat(95) + '。' + '乙'.repeat(10) // 首句 96 字，总 106
+  const cut = typeof tidy === 'function' ? tidy(long) : ''
+  check('K37', long.length === 106 && cut.length === 90, `in=${long.length} out=${cut.length}`)
+}
+
 // K35：最终句子上限——95 字输入应被切成正好 90 字
 {
   const tidy = globalThis.__saynextTest?.tidy
