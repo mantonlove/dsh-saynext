@@ -112,8 +112,18 @@ def call(system, prompt, model):
     }).encode()
     req = urllib.request.Request('https://api.moark.com/v1/chat/completions', data=body,
                                  headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        data = json.loads(resp.read())
+    timeout = float(os.environ.get('REPLAY_TIMEOUT', '180'))
+    last = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
+            break
+        except Exception as err:  # 网络抖动/超时：重试一次，最多三次
+            last = err
+            print(f'  (attempt {attempt + 1} failed: {type(err).__name__})')
+    else:
+        raise last
     ch = data['choices'][0]
     print(f"  (finish={ch.get('finish_reason')} usage={data.get('usage',{}).get('completion_tokens')})")
     return (ch['message'].get('content') or '').strip()
