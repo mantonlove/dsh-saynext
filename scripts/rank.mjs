@@ -1,10 +1,10 @@
 /**
- * 复跑一次采样的本地排序，打印每组候选的分数与最终会选中的那条。
+ * 复跑一次采样的本地排序，打印每组候选的筛选结果和最终选择。
  * 用法：DSH_SAYNEXT_TEST=1 node scripts/rank.mjs samples.txt
  *      samples.txt 每行一条候选，用空行分组（即 scripts/replay.py 输出的样子）。
  * 可选第二参数：对话 JSON（replay.py 的 REPLAY_MESSAGES_OUT 产物）。
- *      不给时用空上下文，此时 echo/reuse/selftalk 不会触发，只比确定性项
- *      （具体对象/动词开头/长度/是否附和）。
+ *      不给时按空上下文筛选
+ *      （空话、残句等）。
  */
 import { readFileSync } from 'node:fs'
 
@@ -26,10 +26,16 @@ if (t === undefined) {
   process.exit(1)
 }
 
+if (process.argv[2] === '--prompt') {
+  const messages = JSON.parse(readFileSync(0, 'utf8')).map(({ role, text }) => ({ role, content: text }))
+  console.log(JSON.stringify({ system: t.system, ...t.frameTranscript({ deriveMessages: () => messages }) }))
+  process.exit(0)
+}
+
 const text = readFileSync(process.argv[2], 'utf8')
 const groups = text.split(/\n\s*\n/).map((chunk) => chunk.split('\n').filter((line) => line.trim() !== ''))
 // 可选的第二个参数：replay.py 用 REPLAY_MESSAGES_OUT 导出的对话，
-// 用来复现 echo/reuse/selftalk 这类依赖上下文的判定。
+// 用来复现 echo/selftalk 这类依赖上下文的判定。
 const messagesFile = process.argv[3]
 const transcript = messagesFile === undefined ? [] : JSON.parse(readFileSync(messagesFile, 'utf8'))
 const session = {
@@ -40,6 +46,6 @@ for (const group of groups) {
   index += 1
   const ranked = t.rankCandidates(group.join('\n'), session, '')
   console.log(`\n第 ${index} 组`)
-  for (const item of ranked) console.log(`  ${item.score}  ${item.reason ?? 'ok'}  ${item.text}`)
-  console.log(`  选中 → ${ranked[0]?.text ?? '（无候选）'}`)
+  for (const item of ranked) console.log(`  ${item.reason ?? 'ok'}  ${item.text}`)
+  console.log(`  选中 → ${ranked.find((item) => item.reason === null)?.text ?? '（无合格候选）'}`)
 }

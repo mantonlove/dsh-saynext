@@ -30,7 +30,7 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 - **Inside the input box**: same slot as the host placeholder, so it adds no height and never collides with the goal bar, todo list, or queued messages.
 - **Never steals focus or keys**: the grey line is display-only; clicks and ordinary typing pass through to the composer. The plugin takes over exactly one key: the Enter you press inside the composer to accept the suggestion.
 - **Per-session**: with several sessions open, each shows its own suggestion; session A's guess never lands in session B's composer.
-- **A usable line first, polish later**: whenever the current best line still has one of these problems, it retries with the reason attached, at most twice — pure acknowledgements ("sure", "go ahead", "continue", "got it"), lines with no concrete object, a copy of what the assistant just wrote, identifiers only the assistant used (`trace`, `publish ok`, commit ids only it mentioned), a repeat of something you just said, lines starting with "you" (the assistant's voice, not yours), and lines about this plugin itself. If the retry still fails: **filler, empty output, lines with no object, identifiers only the assistant used, or talk about this plugin** keep **no** suggestion — better an empty box than noise. The other three (a copy of the assistant's sentence, a repeat of your own words, a line in the assistant's voice) are "right direction, wrong wording": the line is shown and the reason goes to the log.
+- **Suggestions follow your goal**. The plugin reserves room for your messages. Suggestions use the conversation’s language to express a specific question, correction or request in plain terms. The model ranks replies against the current goal and new information. The client-facing suggestion is the first eligible reply in that order. A newly reported fee or error code can be relevant. A short confirmation can answer a request to start an operation the user already chose. For choices, personal claims and consequential changes, the generator can attach a supporting user quote for screening. Only the reply is displayed. Uncertain or completed turns can be left blank.
 - **Bound to a turn**: every suggestion remembers the turn it belongs to. It shows only when it belongs to the
   session's latest turn, that turn ended normally, and the composer is empty. A new turn invalidates the old line
   immediately (read from the host timeline, not from polling); a failed, interrupted or timed-out turn shows the
@@ -38,11 +38,14 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 - **A restart costs nothing**: a restart or hot reload never re-runs the model; it only shows a cache that is
   still valid for the current turn, otherwise it waits for the next normal finish. Retries during generation
   are described under cost control below — a turn costs at most three calls.
-- **No repeats**: if the model returns the same sentence twice in a row, it retries once with that sentence excluded; a second duplicate is dropped.
+- **No repeats**. The plugin filters out the suggestion it last displayed in the session.
+- An explicit new writing request starts fresh context for the suggestion. A short follow-up such as “继续” retains earlier turns. Screening checks whether a candidate would postpone the requested deliverable.
 - **Control when it runs and what it costs**: turn it off entirely, set a cooldown (it gates the first request of a turn; the same-turn retries are not gated), a minimum transcript length, and a timeout. A finished, non-skipped turn sends one request. Any of the cases above triggers a retry with the reason attached, at most two retries, so a turn costs at most three calls.
 - **Auditable**: the trace log is on by default; it mainly records session id, turn number, suggestion length, the chosen provider / model and a few status lines — never the conversation text.
 
-## Install (the npm registry; the DSH profile itself uses pnpm)
+## Install
+
+Choose sharing or local-only on the author’s download page. Quit DSH, run the installation command shown for that choice in the download directory (Node.js and pnpm required), then reopen DSH. The installer enables the plugin and records the choice in this OS user’s desktop profile. Running a forwarded installer without arguments starts in local-only mode.
 
 **Plugin market** (once listed): Settings → Plugin market → search `dsh-saynext` → install.
 
@@ -74,12 +77,12 @@ ln -s ~/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery \
 ```
 
 Host-side changes need an app restart; UI-only changes (`lib/client.js`) need a window refresh.
-Tests live in the repo: `npm test` runs four suites (UI pure functions, single-instance DOM, multi-session DOM, generation-side gates) on Node 22+, with no dependencies to install.
+Tests live in the repo: `npm test` runs the UI, suggestion, session-context and evaluation suites on Node 22+ after installing the development dependencies.
 
 ## How it works
 
 ```
-turn ends normally ──► take the last 4 turns of this session (up to 4000 chars)
+turn ends normally ──► read the session goal summary and the latest three paired turns
                             │
                             ▼
                  ask once, using that session's own provider / model
@@ -92,8 +95,14 @@ turn ends normally ──► take the last 4 turns of this session (up to 4000 c
 ```
 
 - Only `turn/end` with `reason.kind === 'completed'` triggers it; interrupts and errors produce nothing, and nothing is guessed.
-- Generation uses the streaming API; on error or timeout the partial text is discarded — **an unfinished sentence is never put in your input box**.
+- A normal stop completes the final candidate even without a trailing newline. If the model hits its token limit, the stream is interrupted, or the request times out, only newline-terminated candidates enter ranking.
 - If a session declares no provider / model, the plugin skips it rather than falling back to a default.
+
+Type `/saynext-goal` in the conversation to inspect the goal, requirements, reported progress and open questions with source turns. Supply a new goal to correct it, or `clear` to resume automatic extraction. The normal DSH session log retains the correction across windows and restarts. The development [evaluation guide](docs/evaluation.md) describes the four metrics.
+
+### Local usage statistics
+
+Open **建议统计** in the conversation header (or its overflow menu) to see device totals or the current conversation. Display coverage counts visible suggestions per eligible composer round. Direct use counts verbatim text among confirmed subsequent sends. After the next confirmed send, the client estimates intent and serious errors independently using offline text rules and the preceding request. Each rate uses its own judged denominator. Partial intent matches are separate. Ambiguous or attachment-bearing sends can remain unjudged. Expand **依据与纠正** on a comparison to inspect the reasons, change either result or select **沿用自动** to restore its estimate. Prior manual labels are preserved. Reopening a conversation can backfill old displayed suggestions. IndexedDB stores suggestions, outcomes, reason codes and overrides on this device and origin. The actual message is read from the loaded conversation and is not copied to the statistics database. Grading does not call a model or upload statistics.
 
 ## Configuration
 
@@ -107,19 +116,21 @@ In the mount block of `~/.dsh/profiles/desktop/cordis.patch.yml`:
       enabled: true            # false = never call the model
       cooldownMs: 0            # minimum gap between the first requests of consecutive turns of the same session, measured from the start of the turn's attempt; the same-turn retries are not gated; 0 = no limit
       minTranscriptChars: 40   # shorter transcripts are not worth asking about
-      timeoutMs: 20000         # per-generation timeout; when it fires the plugin stops waiting and drops the result, without relying on upstream honouring abort
+      timeoutMs: 20000         # per-generation timeout; stops waiting and keeps newline-terminated candidates
 ```
 
 All four live in the mount block and are read when the plugin loads; a change takes effect after the plugin reloads (restarting the app is the simplest way). Client-side changes only need a window refresh.
 
 The plugin declares the DSH range `>=0.2.0-rc.2 <0.4.0-0`; DSH outside that range will not load it.
 
+Desktop applies the download choice automatically. Suggestion Statistics shows the current choice and lets you change it. Fresh direct npm or market installs start local-only. Sharing starts with new turns after consent. It includes opportunities, displayed text, the next human message, fill and review outcomes, and up to 1,200 characters each from the current request and assistant reply. Attachments are flagged only. Stopping sharing clears the local upload queue. A build without a configured endpoint stays local.
+
 ## Privacy and cost
 
-- Only **this session's recent conversation text** is sent to the provider / model you configured in DSH for that session. The plugin has no outbound endpoint of its own (no server, no relay); if the provider you configured is itself a third-party service, that text travels under that service's terms.
+- Only **this session's summary, relevant references and recent conversation text** is sent to the provider / model you configured in DSH for that session. A build with an author feedback endpoint also transmits the disclosed samples after the user opts in; if the provider you configured is itself a third-party service, that text travels under that service's terms.
 - The result is a small JSON blob stored in the plugin's own config namespace `saynext.hint`, inside your DSH profile config, not in the project directory.
 - The trace log goes to `~/.dsh/saynext/trace.log` by default (the log directory is created with mode 0700, the file with 0600; the size is checked every 200 writes, so a file past 512 KB is rotated at that check, not necessarily on the very next write). It **never records conversation text**: only session id, turn number, suggestion length, the chosen provider/model (with its source) and a few status lines (`apply`, `bus attach`, `skip short transcript`, `publish try`); set `DSH_SAYNEXT_TRACE=0` to disable it.
-- A finished turn that is not skipped costs one extra model call: up to 4000 characters of conversation text to build the request, 900 output tokens for the three candidates (raw output is capped at 160 characters and the chosen line is trimmed to 90), 20 s timeout. The plugin retries whenever the current best line is rejected (pure agreement, a line with no concrete object, a copy of the assistant's words, identifiers only the assistant used, a repeat of your own words, a line starting with "you", or talk about this plugin), at most twice, so the worst case is three calls per turn; if the turn produced no usable line at all (empty output, or truncated before any line finished), it gives up without retrying; if the retry still fails, the two-tier rule applies (filler, empty output, identifiers only the assistant used, or talk about this plugin: no suggestion; a copy of the assistant's sentence, a repeat of your own words, or a line in the assistant's voice: shown with the reason logged). That usage is billed to your own account.
+- The three most recent turns receive 1,440, 900 and 550 UTF-16 code units respectively. The session summary and a relevant earlier reference are included separately. The output budget is 900 tokens and the default timeout is 20 seconds. The model can offer up to three lines, each limited to 40 Chinese characters and 80 code units. Empty output and an explicit skip end generation. When all candidates fail screening, the plugin retries at most twice and leaves the composer empty if none passes.
 
 ## Boundaries
 
@@ -132,7 +143,7 @@ The plugin declares the DSH range `>=0.2.0-rc.2 <0.4.0-0`; DSH outside that rang
 | No conversation timeline available (version mismatch or a changed entry point) | The grey line is not drawn: better an empty composer than a line nobody can prove is current |
 | Several sessions at once | One suggestion per session, up to 8 cached; recently updated ones move to the back of the eviction queue |
 | Session declares no provider / model | Nothing is generated; no default is invented |
-| Upstream error or timeout | Complete lines are still used as candidates; if none is complete, the placeholder stays (the previous turn's line has already expired with its turn) |
+| Output limit reached, stream interrupted, or request timed out | Complete lines are still used as candidates; if none is complete, the placeholder stays (the previous turn's line has already expired with its turn) |
 | The UI cannot set the draft | The grey line is not drawn at all (showing it would be worse) |
 | Plugin disabled, cooldown not elapsed, or transcript too short | Skipped entirely; no model call |
 | The previous suggestion for this session is still being generated | Skipped; nothing is queued and no parallel call is made |
@@ -141,7 +152,7 @@ The plugin declares the DSH range `>=0.2.0-rc.2 <0.4.0-0`; DSH outside that rang
 ## FAQ
 
 **No grey line after refreshing?**
-Check three things: the composer is empty, no turn is running in that session, and the last turn ended normally. Generation waits for the model; a failure or timeout skips that turn and never writes a partial line.
+Check three things: the composer is empty, no turn is running in that session, and the last turn ended normally. If generation ended early before any candidate line was complete, the placeholder stays visible.
 
 **The guess is off.**
 It only sees this session's recent context, not your long-term preferences. Treat it as a draft prompt: you can edit it, or delete the whole line and write your own.

@@ -35,6 +35,8 @@ def messages_until_turn_end(target_turn):
         t = ev.get('type')
         if t in ('user/message', 'assistant/message'):
             data = ev.get('data') or {}
+            if t == 'user/message' and data.get('source', {}).get('kind') != 'user':
+                continue
             if t == 'assistant/message':
                 data = data.get('message') or {}
             text = text_of(data)
@@ -79,8 +81,7 @@ def frame(all_msgs):
     ] if p])
     return prompt, chars
 
-def system_prompt(path, marker):
-    src = open(path, encoding='utf-8').read()
+def system_prompt(src):
     start = src.index('const SYSTEM = [')
     end = src.index("].join('\\n')", start)
     body = src[start:end]
@@ -131,40 +132,44 @@ def call(system, prompt, model):
 target = int(sys.argv[1]) if len(sys.argv) > 1 else 90
 msgs = messages_until_turn_end(target)
 
-# 把这段对话导出，供 scripts/rank.mjs 用真实上下文复跑排序（echo/reuse/selftalk 依赖它）。
+# 把这段对话导出，供 scripts/rank.mjs 用真实上下文复跑排序（echo/selftalk 依赖它）。
 _out = os.environ.get('REPLAY_MESSAGES_OUT')
 if _out:
     import json as _json
     with open(_out, 'w', encoding='utf-8') as _f:
-        _json.dump([{'role': r, 'text': t} for r, t in msgs], _f, ensure_ascii=False)
+        _json.dump(msgs, _f, ensure_ascii=False)
 print(f'turn {target} 结束前的消息数: {len(msgs)}')
-prompt, chars = frame(msgs)
+project = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+current = json.loads(subprocess.run(
+    ['node', 'scripts/rank.mjs', '--prompt'], cwd=project, input=json.dumps(msgs, ensure_ascii=False),
+    capture_output=True, text=True, check=True, env={**os.environ, 'DSH_SAYNEXT_TRACE': '0'},
+).stdout)
+prompt, chars = current['prompt'], current['chars']
 print(f'prompt 字符数: {chars}')
 print('--- prompt 末尾 300 字 ---')
 print(prompt[-300:])
 print('---')
 
-path = '/Users/manton/CC/projects/dsh开发/dsh-saynext/lib/index.js'
-new_sys = system_prompt(path, 'new')
-old_sys = new_sys.replace('\n- 不要复用你上一条回答里的术语、变量名、命令名或代号（例如 trace、repeat-user、publish ok），\n   也不要用它们造句；用户已经看过那句话，不需要你把话再说一遍；', '')
-print('新提示词含「不要复用」规则:', '不要复用你上一条回答里的术语' in new_sys)
-
 mode = os.environ.get('REPLAY_MODE', 'both')
 sample_n = int(os.environ.get('REPLAY_SAMPLES', '1'))
 pairs = []
+if mode in ('both', 'old', 'variant'):
+    old_src = subprocess.check_output(['git', 'show', '650e1b2:lib/index.js'], cwd=project, text=True)
+    old_sys = system_prompt(old_src)
+    old_prompt, _ = frame(msgs)
 if mode in ('both', 'old'):
-    pairs.append(('旧', old_sys))
+    pairs.append(('旧', old_sys, old_prompt))
 if mode in ('both', 'new'):
-    pairs.append(('新', new_sys))
+    pairs.append(('新', current['system'], prompt))
 if mode == 'variant':
-    variant = new_sys.replace(
+    variant = old_sys.replace(
         '   也不要用它们造句；用户已经看过那句话，不需要你把话再说一遍；',
         '   也不要用它们造句；凡是上一条回答里出现过的英文词、文件名、命令名（trace.log、repeat-user 这类），整句都不要出现；用户已经看过那句话，不需要你再讲一遍；')
-    pairs.append(('变体', variant))
-for label, sysprompt in pairs:
+    pairs.append(('变体', variant, old_prompt))
+for label, sysprompt, sample_prompt in pairs:
     hits = 0
     for i in range(sample_n):
-        out = call(sysprompt, prompt, 'DeepSeek-V4.1-Flash-1017')
+        out = call(sysprompt, sample_prompt, 'DeepSeek-V4.1-Flash-1017')
         hit = 'trace' in out.lower()
         hits += hit
         if os.environ.get('REPLAY_JSON') == '1':

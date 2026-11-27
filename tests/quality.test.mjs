@@ -42,7 +42,7 @@ function makeCtx(texts, messages) {
         return (async function* () {
           if (text !== null) yield { type: 'text-delta', text }
           if (fail) yield { type: 'error', reason: { kind: 'aborted' } }
-          else yield { type: 'finish', reason: { kind: 'stop' } }
+          else if (entry?.finish !== null) yield { type: 'finish', reason: { kind: entry?.finish ?? 'stop' } }
         })()
       },
     },
@@ -60,13 +60,16 @@ async function run(texts, messages) {
   return { calls, writes }
 }
 
-// K1：提示词结构（含 AI 结尾节选与判断指令）
 {
-  const { calls } = await run(['跑一遍 smoke-freeze.json 的冒烟测试'])
+  const goal = '妈妈晚上睡得浅，两间房哪间安静？'
+  const offer = '要不要我先给你比较一下早餐？'
+  const { calls } = await run(['哪间房离电梯远一点？'], [
+    { role: 'user', content: goal }, { role: 'assistant', content: '酒店介绍'.repeat(1400) + offer },
+  ])
   const prompt = calls.prompts[0] ?? ''
-  check('K1a', prompt.includes('AI 最后一条的结尾'), '提示词带 AI 结尾节选')
-  check('K1b', prompt.includes('判断用户此刻最有价值的下一步'), '提示词要求判断下一步')
-  check('K1c', (calls.systems[0] ?? '').includes('禁止附和'), 'system 明确禁止附和')
+  check('K1a', prompt.includes(goal), '长回答仍保留用户原话')
+  check('K1b', prompt.split(offer).length === 2, '助手的提议只出现一次')
+  check('K1c', prompt.length < 4200, '请求保持在原正文预算内')
 }
 
 // K2：附和句会被重问一次，第二句合格就采用
@@ -198,10 +201,9 @@ async function run(texts, messages) {
   check('K19', hint.includes('跑一遍链接检查脚本'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K20：复述两次 → 降级采纳（先保证有建议，原因记进日志）
 {
   const { writes } = await run(['还差英文里的软链目标检查', '还差英文里的软链目标检查'])
-  check('K20', writes.length === 1, `写入次数=${writes.length}`)
+  check('K20', writes.length === 0, '只会复述助手则留空')
 }
 
 // K23：把用户刚说过的话原样端回来 → 重问，改用新的下一步
@@ -212,37 +214,31 @@ async function run(texts, messages) {
   check('K23', hint.includes('pnpm pack'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K24：两次都只是复述用户的话 → 降级采纳
 {
   const said = '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。'
   const { writes } = await run([said, said])
-  check('K24', writes.length === 1, `写入次数=${writes.length}`)
+  check('K24', writes.length === 0, '只会复述用户则留空')
 }
 
-// K21：以「你」开头（AI 对用户说话的口吻）→ 重问，改用用户的口令
 {
-  const { writes } = await run(['你来重启，测试已全 PASS，重启后核对载荷', '重启后查一遍 trace.log 里有没有 publish 失败'])
+  const { writes } = await run(['我可以帮你重启，重启后核对载荷', '重启后查一遍 trace.log 里有没有 publish 失败'])
   const hint = writes.at(-1)?.hint ?? ''
   check('K21', hint.includes('重启后查一遍 trace.log'), `写入=${hint.slice(0, 60)}`)
 }
 
-// K22：连续两次都是「你来…」→ 降级采纳
 {
-  const { writes } = await run(['你来重启一下看看', '你可以先跑一遍看看'])
-  check('K22', writes.length === 1, `写入次数=${writes.length}`)
+  const { writes } = await run(['要我帮你重启吗？', '你可以先跑一遍看看'])
+  check('K22', writes.length === 0, '助手的口吻不进入草稿')
 }
 
-// K25：建议复用「只有 AI 说过」的标识符 → 重问，改用不含该标识符的一句
+// 助手首次给出的错误码可以是解决用户问题所需的线索。
 {
-  const messages = [
-    { role: 'user', content: [{ type: 'text', text: '把 README 的英文那份补齐' }] },
-    { role: 'assistant', content: [{ type: 'text', text: '已跑完 tests/quality.test.mjs，publish ok 之后 rev 回到 1。' }] },
-  ]
-  const { calls, writes } = await run(['再看 tests/quality.test.mjs 的输出', '把英文那份的安装三步补齐'], messages)
-  const hint = writes.at(-1)?.hint ?? ''
-  check('K25a', calls.n === 2, `调用次数=${calls.n}`)
-  check('K25b', hint.includes('安装三步') && !hint.includes('quality.test'), `写入=${hint.slice(0, 60)}`)
-  check('K25c', (calls.prompts[1] ?? '').includes('标识符'), '重问时点明复用标识符')
+  const question = 'E_EXPORT_TIMEOUT 发生在哪一步？'
+  const {calls, writes} = await run([question], [
+    {role:'user',content:'导出一直失败，帮我找出具体原因，别再让我从头重试。'},
+    {role:'assistant',content:'日志显示 E_EXPORT_TIMEOUT，导出任务在服务器端超时。'},
+  ])
+  check('K25', calls.n === 1 && JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === question, '新错误码可直接用于追问')
 }
 
 // K26：同一个标识符用户自己也说过 → 放行，不重问
@@ -295,9 +291,9 @@ async function run(texts, messages) {
 
 // K31：首轮只剩「带毛病但分高」的候选，重问给出「干净但分低」的 → 采用干净的
 {
-  const { calls, writes } = await run(['把插件的日志调一下', '检查一下'])
+  const { calls, writes } = await run(['把插件的日志调一下', '英文版现在也能按这三步装好吗？'])
   const hint = writes.at(-1)?.hint ?? ''
-  check('K31', calls.n === 2 && hint.includes('检查一下'), `calls=${calls.n} hint=${hint.slice(0, 60)}`)
+  check('K31', calls.n === 2 && hint.includes('三步装好吗'), `calls=${calls.n} hint=${hint.slice(0, 60)}`)
 }
 
 // K32：输出被截断（末行没有换行结尾）→ 末尾半句丢掉，只用完整行
@@ -313,16 +309,13 @@ async function run(texts, messages) {
   check('K33', calls.n === 1 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
 }
 
-// K34：候选复用只有 AI 说过的标识符 → 重问后仍复用则不写
+// 即便含有必要术语，逐字照搬助手的答案仍是复述。
 {
-  const { calls, writes } = await run(
-    ['把 trace.log 尾部 20 行贴出来', '把 trace.log 尾部 20 行贴出来'],
-    [
-      { role: 'user', content: [{ type: 'text', text: '把 README 的中英两版对齐一下，顺手把安装三步补齐，别只改中文那份。' }] },
-      { role: 'assistant', content: [{ type: 'text', text: '改完了，顺手把 trace.log 的尾部留了一份。要我贴出来吗？' }] },
-    ],
-  )
-  check('K34', calls.n === 3 && writes.length === 0, `calls=${calls.n} writes=${writes.length}`)
+  const answer = '导出脚本运行后出现 E_EXPORT_TIMEOUT 错误。'
+  const {calls, writes} = await run([answer], [
+    {role:'user',content:'导出报告一直失败，能查出具体原因吗？'}, {role:'assistant',content:answer},
+  ])
+  check('K34', calls.n === 3 && writes.length === 0, '仅复述则留空')
 }
 
 // K36：95 字且第 30 字是句号 → 先按句号切走第一句（30 字），截断不该把句号连同后半句一起吞掉
@@ -348,6 +341,165 @@ async function run(texts, messages) {
   const long = '跑一遍测试'.repeat(19) // 5 × 19 = 95 字，无标点，不会触发句级切分
   const cut = typeof tidy === 'function' ? tidy(long) : ''
   check('K35', typeof tidy === 'function' && long.length === 95 && cut.length === 90, `in=${long.length} out=${cut.length}`)
+}
+
+const partial = '跑一遍文档链接检查并把'
+{
+  const brief = '现在我想写一篇长帖子介绍我dsh-saynext这个插件'
+  const detour = '长帖先放一放，先把我账号该改的几处列出来。'
+  const edit = '把长帖开头压短一点，直接说这个插件能帮读者做什么。'
+  const history = [
+    { role: 'user', source: {kind: 'user'}, content: '看一下我现在的账号，哪些地方需要改进？' },
+    { role: 'assistant', content: '账号简介和头像都可以改。' },
+    { role: 'user', source: {kind: 'user'}, content: brief },
+    { role: 'user', source: {kind: 'tool'}, content: [{type: 'text', text: '工具留下的账号清单'}] },
+    { role: 'user', source: {kind: 'runtime-context'}, content: '后台账号检查' },
+    { role: 'assistant', content: [{type: 'reasoning', text: '也许应该先改账号'}, {type: 'text', text: '长帖已经写好，开头还可以压短，也可以调第三段的语气。'}] },
+  ]
+  const { calls, writes } = await run([detour + '\n' + edit], history)
+  const prompt = calls.prompts[0]
+  check('K47a', prompt.includes(brief) && !prompt.includes('哪些地方需要改进') && !prompt.includes('后台账号检查')
+    && !prompt.includes('也许应该先改账号') && !prompt.includes('工具留下'), '明确的新任务只使用本轮可见对话')
+  check('K47b', calls.n === 1 && JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === edit, '同批丢弃截图原句，保留长帖修改建议')
+  const rejected = await run([detour], history)
+  check('K47c', rejected.calls.n === 3 && rejected.writes.length === 0, '三次都擅自搁置长帖时留空')
+  const changed = await run(['先看看账号简介该怎么改。'], [...history,
+    {role: 'user', content: '我改主意了，长帖先放一放，先改账号简介。'},
+    {role: 'assistant', content: '可以，先看看你现在的介绍。'}])
+  check('K47d', changed.calls.n === 1 && changed.writes.length === 1, '用户可以亲自把任务切回账号')
+  const followup = globalThis.__saynextTest.frameTranscript({deriveMessages: () => [...history, {role:'user', content:'继续'}]})
+  check('K47e', followup.prompt.includes(brief), '简短的继续保留上文')
+  const sendLater = '先别发布长帖，把开头两句改得更口语一点。'
+  const drafted = await run([sendLater], history)
+  check('K47f', JSON.parse(drafted.writes[0]?.hint ?? '{}').items?.[0].text === sendLater, '暂缓发布仍可继续修改草稿')
+  const continued = await run([detour, edit], [...history, {role:'user', content:'继续'}, {role:'assistant', content:'刚改好了。'}])
+  check('K47g', continued.calls.n === 2 && JSON.parse(continued.writes[0]?.hint ?? '{}').items?.[0].text === edit, '简短跟进时继续保护最近明确要求的稿件')
+  const report = await run(['报告先放一边，先看还有哪些会议。', '把结论放到报告第一页。'], [
+    {role:'user', content:'我想写一份报告，供下周例会讨论，重点是今年的预算和实际开销之间有哪些差别。'},
+    {role:'assistant', content:'初稿已完成，预算部分在最后。'}])
+  check('K47h', report.calls.n === 2 && JSON.parse(report.writes[0]?.hint ?? '{}').items?.[0].text === '把结论放到报告第一页。', '同一规则覆盖其他交付物')
+}
+{
+  const messages = [
+    { role: 'user', content: '两间房哪间安静？我妈晚上容易醒，尤其怕门口有人来来往往。' },
+    { role: 'assistant', content: '两家早餐种类都很多，我可以给你做一份对比表格。' },
+  ]
+  const question = '你知道哪间房离电梯远一点吗？'
+  const { calls, writes } = await run([question + '\n列一张早餐表格'], messages)
+  check('K42', calls.n === 1 && JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === question, '用户关心安静，优先房间问题')
+}
+{
+  const { calls, writes } = await run(['<skip>'])
+  check('K43', calls.n === 1 && writes.length === 0, '没有必要追问时直接留空')
+}
+{
+  const question = '我每个月到底能少花多少钱？'
+  const { writes } = await run([question + '\n跑一遍脚本核对12项参数'])
+  check('K44', JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === question, '自然问句不会因缺少命令或数字落选')
+}
+{
+  const reply = '用两次扣款记录确认实际付了几笔'
+  const { writes } = await run([reply], [
+    { role: 'user', content: '我只担心连续点两次付款，钱会不会扣两次。' },
+    { role: 'assistant', content: '现在只试过点一次。可以去测试环境连点两次，看最后有几笔扣款。' },
+  ])
+  check('K45', JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === reply, '切合用户目标的后续操作可以采用')
+}
+{
+  const cached = { sessionId: 'second-session', turn: 12, text: '检查之前保存的报告', rev: 1, at: 123 }
+  const { ctx, calls, writes, fire } = makeCtx(['跑一遍文档链接检查'])
+  mod.apply(ctx, { hint: JSON.stringify({ rev: 1, items: [cached] }) })
+  check('K41a', calls.n === 0 && writes.length === 0, '恢复已有建议时没有模型请求和写入')
+  fire(8)
+  await new Promise((resolve) => setTimeout(resolve, 60))
+  const restored = JSON.parse(writes.at(-1)?.hint ?? '{}')
+  check('K41b', restored.rev === 2 && restored.items?.length === 2 && restored.items[0].sessionId === cached.sessionId
+    && restored.items[0].text === cached.text && restored.items[0].turn === cached.turn
+    && restored.items[1].turn === 8 && calls.n === 1, '首个新回合写入时保留另一会话的缓存')
+}
+
+for (const finish of ['max-tokens', 'aborted', null]) {
+  const { calls, writes } = await run([{ text: partial, finish }])
+  check(`K38-${finish}`, calls.n === 1 && writes.length === 0, '只有半句时放弃本轮')
+}
+
+{
+  const messages = [
+    {role:'user',content:'我明年还要续费，帮我比较这两个方案的总成本。'},
+    {role:'assistant',content:'目前只核算了基础报价。乙多一笔迁移费，还没有算进去。要我给表格加个标题吗？'},
+  ]
+  const preferred = '乙的迁移费算进去后还便宜吗？'
+  const {calls,writes} = await run([preferred+'\n表格标题写成「两年总成本」。'], messages)
+  check('迁移费', calls.n === 1 && JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === preferred, '保留按上下文生成的首选')
+  const skip = await run(['<skip>\n表格标题写成「两年总成本」。'], messages)
+  check('首选留空',skip.calls.n===1 && !skip.writes.length)
+}
+{
+  const chosen = '请安装导出组件，开始之前先和我确认。'
+  const question = '导出组件已经就绪，版本与依赖也已核对。现在安装吗？'
+  const cases = [
+    ['短确认',chosen,question,'装吧',true],
+    ['句号',chosen,question,'装吧。',true],
+    ['不需补字',chosen,question,'好',true],
+    ['带时间词',chosen,question,'现在安装。',true],
+    ['未选定的确认','只核对组件的兼容性，先别安装。',question,'确认安装。',false],
+    ['禁止操作','只核对组件的兼容性，先别安装。',question,'装吧。',false],
+    ['新操作','请导出上月的全部报表。',question,'装吧',false],
+    ['仅作说明','安装会收费，先看报价。',question,'装吧',false],
+    ['疑问','这个导出组件现在能安装了吗？',question,'装吧。',false],
+    ['任务结束',chosen,'导出组件已经成功安装，版本和依赖均已核对。','好',false],
+    ['多个选项',chosen,'需要安装正式版还是测试版？','装吧',false],
+    ['换对象','请删除数据库备份，执行前请确认。','已经准备好了。现在删除数据库吗？','好。',false],
+    ['拒绝扩大','请安装导出组件。','已完成兼容性检查。现在安装并且发布吗？','好',false],
+    ['英文','Please install the export component. Confirm before starting.','The export component is ready. Shall I install it?','Yes',false],
+    ['英文明确','Please install the export component. Confirm before starting.','The export component is ready. Shall I install the export component?','Yes',true],
+    ['简短提问',chosen,question,'多久？',true],
+  ]
+  for (const [name,user,assistant,candidate,allowed] of cases) {
+    const {writes,calls}=await run([candidate,'<skip>'],[{role:'user',content:user},{role:'assistant',content:'当前正在检查导出组件的版本和依赖，汇总完成后需要确认处理方式。'+assistant}])
+    check('短句-'+name, allowed ? calls.n === 1 && JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === candidate : calls.n >= 1 && writes.length === 0)
+  }
+}
+
+{
+  const cases = [
+    ['询问原因', '为什么硬盘占用这么高？', '缓存占用较大，要清理吗？', '清掉吧，其他文件都留着。', null],
+    ['授权依据', '请删除测试副本，保留原件。', '已定位测试副本，准备完成。', '["删除测试副本。","删除测试副本"]','删除测试副本。'],
+    ['编号内的依据', '请删除测试副本，保留原件。', '已定位测试副本，准备完成。', '1. ["删除测试副本。","删除测试副本"]','删除测试副本。'],
+    ['否定被截掉', '不要删除测试副本。', '测试副本还在目录里。', '["删除测试副本。","删除测试副本"]',null],
+    ['先执行再提问', '请检查备份目录。', '测试副本还在目录里。', '删除测试副本，再告诉我剩余空间是多少？',null],
+    ['副词不代表授权', '请检查备份目录。', '测试副本还在目录里。', '下一步继续清空这份目录。',null],
+    ['变更格式需要选择依据','帮我查一下表格打不开的原因。','检查结果是文件头格式不符。','工作表格式改为 CSV。',null],
+    ['只引动词', '请删除测试副本。', '两个数据库都已就绪。', '["删除生产库。","删除"]',null],
+    ['引文来自助手', '请查明存储占用。', '可以删除测试副本。', '["删除测试副本。","删除测试副本"]',null],
+    ['虚构资料', '研究两份报告的评价标准。', '可以先看现有材料，或者收集新材料。', '我手上没有原始报告，请收集材料。',null],
+    ['共同名词不证明缺失', '原始报告已经传给你了。', '已经看到了材料。', '["我没有原始报告，请收集材料。","原始报告"]',null],
+    ['批准分支', '我选轻量版，保留配置。', '下一步可以用轻量版或者完整版。', '["用轻量版继续。","轻量版"]','用轻量版继续。'],
+    ['助手提出新分支', '请调研这个产品的设计。', '可以做轻量版或者完整版。', '先做轻量版。',null],
+    ['错误引文格式', '看看交付进度。', '现有材料已经整理完成。', '["我已经确认过"',null],
+  ]
+  for(const [label,user,assistant,raw,expected] of cases) {
+    const {calls,writes}=await run([raw,'<skip>'],[{role:'user',content:user},{role:'assistant',content:'目前已经完成了初步核对，下面是本轮可供确认的具体信息。'+assistant}])
+    const actual=writes.length ? JSON.parse(writes[0].hint).items[0].text : null
+    check('决定依据-'+label,calls.n>0 && actual===expected)
+  }
+}
+
+const whole = '跑一遍文档链接检查'
+{
+  const plain = '哪一步最耽误时间？'
+  const { writes } = await run(['拉齐打法颗粒度，闭环剩余抓手\n' + plain])
+  check('K46', JSON.parse(writes[0]?.hint ?? '{}').items?.[0].text === plain, '给读得懂的追问留位置')
+}
+for (const suffix of ['', partial]) {
+  const { calls, writes } = await run([{ text: whole + '\n' + suffix, finish: 'max-tokens' }])
+  const chosen = JSON.parse(writes.at(-1)?.hint ?? '{}').items?.[0]?.text
+  check(`K39-${suffix.length}`, calls.n === 1 && chosen === whole, '保留换行前的候选')
+}
+
+{
+  const { calls, writes } = await run([' '.repeat(639) + partial])
+  check('K40', calls.n === 1 && writes.length === 0, '本地达到接收上限也丢弃末尾半句')
 }
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)

@@ -37,6 +37,7 @@ function node(tag) {
   return el
 }
 
+let onVisibilityChange
 const document = {
   head: node('head'),
   body: node('body'),
@@ -48,8 +49,8 @@ const document = {
     return walk(document.head)
   },
   createElement: (tag) => node(tag),
-  addEventListener() {},
-  removeEventListener() {},
+  addEventListener(type, listener) { if (type === 'visibilitychange') onVisibilityChange = listener },
+  removeEventListener(type, listener) { if (onVisibilityChange === listener) onVisibilityChange = undefined },
 }
 
 // 宿主输入卡片：card > grow > (editor, placeholder, overlay 锚点)
@@ -223,6 +224,11 @@ async function main() {
   check('H5', card.hasAttribute('data-saynext-ghost'), '卡片打上隐藏宿主占位符的标记')
   check('H6', (ghosts[0]?.textContent ?? '') === payload.items[0].text, `text=${ghosts[0]?.textContent}`)
 
+  const anchor = mountPoint.querySelector('[data-saynext]')
+  check('H6a', anchor?.getAttribute('data-saynext-opportunity') === 'eligible' &&
+    anchor.getAttribute('data-saynext-session') === 's1' && anchor.getAttribute('data-saynext-turn') === '3' &&
+    ghosts[0]?.getAttribute('data-saynext-turn') === '3', '观察实际渲染的机会与灰字属于同一会话、同一轮')
+
   // Enter：焦点在编辑区 → 只填草稿，并吞掉这次回车
   document.activeElement = editor
   const event = { key: 'Enter', shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, isComposing: false, prevented: false, stopped: false, preventDefault() { this.prevented = true }, stopPropagation() { this.stopped = true } }
@@ -292,6 +298,17 @@ const before18 = filled.length
 const ev18 = { key: 'Enter', shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, isComposing: false, prevented: false, preventDefault() { this.prevented = true }, stopPropagation() {} }
 for (const l of [...windowListeners]) if (l.type === 'keydown') l.fn(ev18)
 check('H18', findGhost(card).length === 0 && filled.length === before18 && ev18.prevented === false, `ghost=${findGhost(card).length} filled+${filled.length - before18}`)
+
+  mountSlot({ tl: timelineOf(4, 'closed', 'completed') })
+  await new Promise(setImmediate)
+  const replacement = '检查英文文档的安装步骤'
+  payload.items[0] = { sessionId: 's1', turn: 4, text: replacement }
+  onVisibilityChange()
+  await new Promise(setImmediate)
+  check('H19a', findGhost(card).some((ghost) => ghost.textContent === replacement), '同一页面收到相同 rev 的新回合')
+  document.activeElement = editor
+  for (const listener of windowListeners.filter((entry) => entry.type === 'keydown')) listener.fn(event)
+  check('H19b', filled.at(-1) === replacement, 'Enter 收下热重载后的新建议')
 
 console.log(`\n${bad === 0 ? 'ALL PASS' : 'FAILED'} pass=${ok} fail=${bad}`)
   process.exit(bad === 0 ? 0 : 1)

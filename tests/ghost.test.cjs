@@ -112,7 +112,7 @@ const styles = fakeStyleNodes.filter((n) => n.getAttribute('id') === 'dsh-saynex
 check('G5a', styles.length === 1, `styles=${styles.length}`)
 check('G5b', /\[data-saynext-ghost\] \[data-composer-placeholder\]/.test(styles[0]?.textContent ?? ''), '规则含占位符选择器')
 
-// G6 槽位注册：只注册 overlay 一处，不再有 dock
+// G6 槽位注册：统计标签和输入层各注册一次
 const registered = []
 const ctx = {
   get: (key) => (key === 'remote' ? { settings: { describe: async () => ({ namespaces: [] }) } } : undefined),
@@ -122,8 +122,8 @@ const ctx = {
   },
 }
 captured.exports.apply(ctx)
-check('G6a', registered.length === 1, `count=${registered.length}`)
-check('G6b', registered[0]?.name === 'conversation.input.overlay' && registered[0]?.id === 'saynext-line' && registered[0]?.order === 100,
+check('G6a', registered.length === 2 && registered.some(m => m.name === 'conversation.view' && m.id === 'saynext-stats'), `count=${registered.length}`)
+check('G6b', registered.some(m => m.name === 'conversation.input.overlay' && m.id === 'saynext-line' && m.order === 100),
   JSON.stringify(registered[0]))
 check('G6c', !registered.some((m) => m.name === 'conversation.input.dock'), '没有 dock 注册')
 
@@ -168,6 +168,65 @@ check('G7g', t.unwrap(null) === undefined && t.unwrap('x') === undefined, '非�
   check('T5b', t.matchesLatest(item, { turn: 3, completed: false }) === false)
   check('T5c', t.matchesLatest({ ...item, turn: 2 }, { turn: 3, completed: true }) === false)
   check('T5d', t.matchesLatest(undefined, { turn: 3, completed: true }) === false)
+}
+
+// 同一批实际观测，四项指标分别使用各自可判定的分母。
+{
+  const rows = [
+    {}, {text:'甲', filled:true}, {text:'乙', outcome:'different', filled:true, intent:'partial', severe:true},
+    {text:'丙', outcome:'exact', intent:'hit', severe:false}, {text:'丁', outcome:'attachment'},
+  ]
+  const m = t.summarizeStats(rows)
+  check('统计-覆盖', String(m.coverage) === '4,5')
+  check('统计-意图', String(m.intent) === '1,2' && m.partial === 1)
+  check('统计-严重性', String(m.severe) === '1,2')
+  check('统计-原样发送', String(m.direct) === '1,3' && m.rewritten === 1)
+  const chat = {
+    timeline:{turns:new Map([[2,{start:{seq:6}, status:'closed'}]])},
+    locations:{getTurn: () => ['context','message']},
+    nodes:new Map([
+      ['context',{kind:'context',data:{source:{kind:'runtime-context'}}}],
+      ['message',{kind:'user',data:{source:{kind:'user'},content:[{type:'text',text:'下一句'},{type:'file'}]}}],
+    ]),
+  }
+  const message = t.followingMessage(chat, 1)
+  check('统计-确认发送及附件', message.text === '下一句' && message.attachment)
+  check('统计-缺失历史保留未知', t.followingMessage(chat,0) === undefined)
+  chat.nodes.delete('message')
+  check('统计-后台消息不能算作本人发送', t.followingMessage(chat,1) === null)
+}
+
+// 同一句的采纳、语义命中和严重性是独立证据；每项纠正可单独撤回。
+{
+  const pairs = [
+    ['原样', '请核实预算。','请核实预算。','', 'hit', false],
+    ['同义', '请核实预算','请核对预算','', 'hit', false],
+    ['调换执行人', '你来核实预算','我来核实预算','', 'miss',true],
+    ['明确主语', '你核实预算','我核实预算','', 'miss',true],
+    ['无授权删除', '删除项目记录','不要删除项目记录','', 'miss',true],
+    ['同一对象的旧限制', '删除原始记录','先核对成本明细','不要删除原始记录', 'miss',true],
+    ['用户改变决定', '删除原始记录','请删除原始记录','不要删除原始记录','hit',false],
+    ['换掉仍在进行的任务', '预算先搁置，改做宣传海报','预算请加上场地费用','请编制活动预算', 'miss',true],
+    ['把提问变成决定', '我决定选择蓝色外壳','蓝色外壳的报价是多少？','', 'miss',true],
+    ['用户另问', '请比较车票价格','解释电池寿命','', 'miss',null],
+    ['只问原因没有授权', '删除项目记录','为什么导出变慢了？','为什么日志在增长？', 'miss',true],
+    ['含附件', '请查附件',{text:'请查附件',attachment:true},'',null,null],
+    ['未发下一句', '请查附件',null,'',null,null],
+    ['简短指代', '请比较车票价格','可以','', null,null],
+  ]
+  for (const [title,suggestion,sent,prior,intent,severe] of pairs) {
+    const follow = typeof sent === 'string' ? {text:sent} : sent
+    const graded = t.judgePair(suggestion, follow, prior)
+    check('初判-'+title, graded.intent === intent && graded.severe === severe, JSON.stringify(graded))
+  }
+  for(const [a,b] of [['核对总数3.14','核对总数314'],['把甲改成乙','把乙改成甲'],['请删除记录','请删除记录吗'],['核对 foo-bar','核对 foo+bar']])
+    check('保留限定 '+a,t.judgePair(a,{text:b}).intent !== 'hit')
+  const auto = {intent:'miss',severe:true}, row = {text:'建议',auto}
+  const corrected = {...row,intent:'hit',severe:false}
+  const remaining = {...row,intent:'unknown'}
+  const stats = t.summarizeStats([row,corrected,remaining])
+  check('纠正独立覆盖两项',String(stats.intent)==='1,2' && String(stats.severe)==='2,3')
+  check('恢复自动和保留待判断',t.decision({...corrected,severe:null},'severe') === true && t.decision(remaining,'intent')==='unknown')
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAILED'} pass=${pass} fail=${fail}`)

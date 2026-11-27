@@ -1,6 +1,6 @@
 {
   "name": "dsh-saynext",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Turn-end next-line suggestions for the DSH composer: the host drafts what you will likely say next, Enter takes it into the input, a second Enter sends it.",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,9 @@
     "README.md",
     "LICENSE",
     "README.en.md",
-    "screenshots.json"
+    "docs/evaluation.md",
+    "screenshots.json",
+    "docs/feedback.md"
   ],
   "engines": {
     "node": "^22.19 || >=24"
@@ -56,6 +58,10 @@
     }
   },
   "scripts": {
-    "test": "node tests/ghost.test.cjs && node tests/dom.test.cjs && node tests/dom-multi.test.cjs && node tests/quality.test.mjs"
+    "test": "node tests/ghost.test.cjs && node tests/dom.test.cjs && node tests/dom-multi.test.cjs && node tests/quality.test.mjs && node --test tests/context.test.mjs tests/evaluation.test.mjs tests/feedback.test.mjs",
+    "evaluate": "node scripts/evaluate.mjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.8"
   }
 }

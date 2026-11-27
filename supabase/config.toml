@@ -1,0 +1,4 @@
+project_id = "dsh-saynext-feedback"
+
+[functions.saynext-feedback]
+verify_jwt = false
