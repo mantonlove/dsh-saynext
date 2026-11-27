@@ -1,4 +1,0 @@
-# dsh-saynext：把宿主插件挂进 loader 树；界面侧由 package.json 的 dsh.client 拉进 boot 图。
-- insert:
-  - id: saynext
-    name: dsh-saynext

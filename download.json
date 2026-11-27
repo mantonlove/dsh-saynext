@@ -1,0 +1,12 @@
+{
+  "version": "0.1.9",
+  "target": {
+    "url": "https://dlajjkozzyclcgypkxlf.supabase.co/functions/v1/saynext-feedback",
+    "owner": "mantonlove · Supabase（日本东京） · github.com/mantonlove/dsh-saynext/issues"
+  },
+  "sha256": "6714f5b24e908b4341b49d10a640e3a2733e1606cd0c59a58dfcb60c3d4caeb1",
+  "desktop": {
+    "name": "SayNext-0.1.9.mjs",
+    "sha256": "8a52ec9f7eb2b37c85373105544bde88f2622e0618c8f5a0a15a94fea6da7c9c"
+  }
+}
