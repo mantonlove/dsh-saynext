@@ -45,11 +45,7 @@ When focus is elsewhere (sidebar search, settings field, rename box), the plugin
 
 ## Install
 
-Choose sharing or local-only on the author’s download page. Quit DSH, run the installation command shown for that choice in the download directory (Node.js and pnpm required), then reopen DSH. The installer enables the plugin and records the choice in this OS user’s desktop profile. Running a forwarded installer without arguments starts in local-only mode.
-
-**Plugin market** (once listed): Settings → Plugin market → search `dsh-saynext` → install.
-
-**npm**:
+**npm (three steps, easiest)**:
 
 ```bash
 cd ~/.dsh/profiles/desktop
@@ -57,6 +53,12 @@ pnpm add dsh-saynext
 ```
 
 Then add `dsh-saynext` to the `dsh.profile.bundles` array in `package.json` and run `pnpm install` once.
+
+**Download page (optional)**: https://mantonlove.github.io/dsh-saynext/ . Pick sharing or local-only there, quit DSH, run the installation command shown for that choice in the download directory (Node.js and pnpm required), then reopen DSH. The installer enables the plugin and records the choice in this OS user's desktop profile. Local-only keeps samples on this machine; sharing starts syncing new turns. Check or stop it later under the suggestion statistics view.
+
+**Plugin market** (once listed): Settings → Plugin market → search `dsh-saynext` → install.
+
+**Local by default**: installing from npm or the market uploads nothing. Only a choice made on the download page starts uploading the shown suggestion, the message you then sent, and up to 1200 UTF-16 units of the previous context (see `docs/feedback.md`).
 
 **Local development** with `link`:
 
