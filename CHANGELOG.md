@@ -2,6 +2,11 @@
 
 按版本倒序；只记对外可见的行为变化，不记内部重构细节。
 
+## 0.1.11
+
+- 修正安装器与 npm 包的一致性校验：`lib/client.js` 里的 `feedbackVersion` 与 `package.json` 版本必须相同，否则 `scripts/package-feedback.mjs` 拒绝出包（0.1.10 就是被这条挡下的）。
+- 下载页与安装器随之更新为 0.1.11；功能与 0.1.9 相同。
+
 ## 0.1.9
 
 - 新增下载入口与桌面安装器：可在页面上选择「同意分享并下载」或「仅下载」，安装器据此写入桌面配置。页面由 GitHub Pages 托管：https://mantonlove.github.io/dsh-saynext/
